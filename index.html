@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JUST DO IT.</title>
+  <style>
+    :root {
+      --gauge-color: #4ade80;
+      --gauge-pct: 0%;
+      --bg: #0f0f1a;
+      --surface: #1a1a2e;
+      --border: #2a2a4a;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --accent: #6366f1;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    /* ======= EXPLOSION OVERLAY ======= */
+    #explosion {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #explosion.active { display: flex; }
+
+    .shia-face {
+      font-size: clamp(80px, 20vw, 160px);
+      animation: shake 0.15s infinite;
+      filter: drop-shadow(0 0 40px #ff4400);
+      margin-bottom: 16px;
+    }
+
+    .just-do-it-text {
+      font-size: clamp(36px, 10vw, 96px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: #fff;
+      text-shadow:
+        0 0 20px #ff4400,
+        0 0 60px #ff8800,
+        0 0 100px #ffaa00;
+      animation: pulse-text 0.3s infinite alternate;
+      text-align: center;
+      line-height: 1.1;
+    }
+
+    .oji-speech {
+      font-size: clamp(16px, 4vw, 28px);
+      color: #ffdd44;
+      margin-top: 24px;
+      text-align: center;
+      padding: 0 24px;
+      animation: fade-bounce 0.5s ease;
+      font-weight: bold;
+      text-shadow: 0 0 10px #ff8800;
+    }
+
+    .sparks {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    #dismiss-btn {
+      margin-top: 40px;
+      padding: 14px 48px;
+      background: transparent;
+      border: 2px solid #ff4400;
+      color: #ff4400;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      transition: all 0.2s;
+    }
+    #dismiss-btn:hover {
+      background: #ff4400;
+      color: #fff;
+      box-shadow: 0 0 30px #ff4400;
+    }
+
+    /* ======= MAIN UI ======= */
+    .wrapper {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .header {
+      text-align: center;
+      padding: 8px 0 4px;
+    }
+    .header h1 {
+      font-size: clamp(24px, 6vw, 36px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(255,68,0,0.4);
+      font-family: 'Arial Black', 'Segoe UI', sans-serif;
+    }
+    .header .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ======= API KEY SETUP ======= */
+    #api-setup {
+      background: var(--surface);
+      border: 1px solid #f59e0b;
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: none;
+    }
+    #api-setup.show { display: block; }
+    #api-setup label {
+      font-size: 13px;
+      color: #f59e0b;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 8px;
+    }
+    #api-setup .api-row {
+      display: flex;
+      gap: 8px;
+    }
+    #api-key-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 8px 12px;
+      outline: none;
+    }
+    #api-key-input:focus { border-color: #f59e0b; }
+    #api-save-btn {
+      padding: 8px 16px;
+      background: #f59e0b;
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* ======= GAUGE ======= */
+    .gauge-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+    .gauge-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .gauge-label span {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .gauge-label .pct {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gauge-color);
+    }
+
+    .gauge-bar {
+      width: 100%;
+      height: 16px;
+      background: #0f0f1a;
+      border-radius: 99px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .gauge-fill {
+      height: 100%;
+      width: var(--gauge-pct);
+      min-width: 4px;
+      background: linear-gradient(90deg, var(--gauge-color), #facc15);
+      border-radius: 99px;
+      transition: width 0.4s cubic-bezier(.4,2,.6,1), background 0.3s;
+      box-shadow: 0 0 10px var(--gauge-color);
+    }
+
+    .gauge-stages {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+    }
+    .gauge-stages span {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* ======= CHAT ======= */
+    .chat-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      height: 320px;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-behavior: smooth;
+    }
+    .chat-box::-webkit-scrollbar { width: 4px; }
+    .chat-box::-webkit-scrollbar-track { background: transparent; }
+    .chat-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+    .msg {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      animation: msg-in 0.25s ease;
+    }
+    .msg.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      border: 2px solid var(--border);
+    }
+
+    /* Avatar A: 炎グラデーション＋リアル系絵文字 */
+    .msg.oji .avatar {
+      background: radial-gradient(circle at 60% 35%, #ff8800 0%, #c0392b 55%, #1e293b 100%);
+      border-color: #ff4400;
+      font-size: 20px;
+      box-shadow: 0 0 10px rgba(255,68,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.4);
+    }
+
+    /* Avatar B: JDIテキストスタイル（.avatar-alt クラスで切り替え可） */
+    .msg.oji .avatar.avatar-alt {
+      background: linear-gradient(135deg, #1a0000 0%, #3d0000 100%);
+      border-color: #ff4400;
+      border-width: 2px;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      color: #ff4400;
+      text-shadow: 0 0 6px #ff4400;
+      box-shadow: 0 0 10px rgba(255,68,0,0.4);
+      font-family: 'Arial Black', sans-serif;
+    }
+
+    .msg.user .avatar { background: #312e81; }
+
+    .bubble {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .msg.oji .bubble {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      border-top-left-radius: 2px;
+      color: var(--text);
+    }
+    .msg.oji .bubble.warning {
+      border-color: #f59e0b;
+      background: #1c1500;
+      color: #fbbf24;
+    }
+    .msg.user .bubble {
+      background: #312e81;
+      border: 1px solid #4338ca;
+      border-top-right-radius: 2px;
+      color: #e0e7ff;
+    }
+
+    /* ======= THINKING ======= */
+    .thinking-dots span {
+      display: inline-block;
+      animation: dot-bounce 1s infinite;
+      font-size: 20px;
+      color: var(--muted);
+    }
+    .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot-bounce {
+      0%,80%,100% { transform: translateY(0); }
+      40% { transform: translateY(-6px); }
+    }
+
+    /* ======= INPUT ======= */
+    .input-area {
+      display: flex;
+      gap: 10px;
+    }
+    .input-area textarea {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 12px 14px;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+      line-height: 1.5;
+      height: 56px;
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+    .input-area textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
+    }
+    .input-area textarea::placeholder { color: var(--muted); }
+
+    .send-btn {
+      width: 56px;
+      height: 56px;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .send-btn:hover { background: #4f46e5; }
+    .send-btn:active { transform: scale(0.95); }
+    .send-btn:disabled { background: var(--border); cursor: not-allowed; }
+
+    /* ======= HINT ======= */
+    .hint {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    /* ======= ANIMATIONS ======= */
+    @keyframes shake {
+      0%,100% { transform: translateX(0) rotate(0deg); }
+      25% { transform: translateX(-6px) rotate(-3deg); }
+      75% { transform: translateX(6px) rotate(3deg); }
+    }
+    @keyframes pulse-text {
+      from { transform: scale(1); }
+      to { transform: scale(1.06); }
+    }
+    @keyframes fade-bounce {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes msg-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes gauge-flash {
+      0%,100% { box-shadow: 0 0 10px var(--gauge-color); }
+      50% { box-shadow: 0 0 30px var(--gauge-color), 0 0 60px var(--gauge-color); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== EXPLOSION ===== -->
+<div id="explosion">
+  <canvas id="sparks-canvas" class="sparks"></canvas>
+  <div id="yt-container" style="display:none; position:absolute; inset:0; z-index:10; background:#000;">
+    <iframe
+      id="yt-iframe"
+      width="100%" height="100%"
+      frameborder="0"
+      allow="autoplay; fullscreen"
+      allowfullscreen
+      style="border:none;"
+    ></iframe>
+    <button id="dismiss-btn-yt" onclick="dismissExplosion()" style="
+      position:absolute; bottom:40px; left:50%; transform:translateX(-50%);
+      padding:14px 48px; background:transparent; border:2px solid #ff4400;
+      color:#ff4400; font-size:18px; font-weight:bold; border-radius:8px;
+      cursor:pointer; letter-spacing:2px; z-index:11;
+    ">…わかった、やる</button>
+  </div>
+  <div class="shia-face">💪</div>
+  <div class="just-do-it-text" id="jdi-text">JUST<br>DO IT!!</div>
+  <div class="oji-speech" id="oji-speech"></div>
+  <button id="dismiss-btn" onclick="dismissExplosion()">…わかった、やる</button>
+</div>
+
+<!-- ===== MAIN ===== -->
+<div class="wrapper">
+  <div class="header">
+    <h1>JUST DO IT.</h1>
+    <p class="subtitle">言い訳したら怒られるやつ</p>
+  </div>
+
+  <div id="api-setup">
+    <label>⚠️ Gemini APIキーを入力してください（aistudio.google.com で取得）</label>
+    <div class="api-row">
+      <input type="password" id="api-key-input" placeholder="AIzaSy...">
+      <button id="api-save-btn" onclick="saveApiKey()">保存</button>
+    </div>
+  </div>
+
+  <div class="gauge-section">
+    <div class="gauge-label">
+      <span>⚡ 言い訳ゲージ</span>
+      <span class="pct" id="gauge-pct">0%</span>
+    </div>
+    <div class="gauge-bar">
+      <div class="gauge-fill" id="gauge-fill"></div>
+    </div>
+    <div class="gauge-stages">
+      <span>😌 大丈夫</span>
+      <span>😐 怪しい</span>
+      <span>😤 危険</span>
+      <span>💥 限界</span>
+    </div>
+  </div>
+
+  <div class="chat-box" id="chat-box"></div>
+
+  <div class="input-area">
+    <textarea id="user-input" placeholder="で、今日は何やるんだ？" rows="2"></textarea>
+    <button class="send-btn" id="send-btn" onclick="handleSend()">↑</button>
+  </div>
+
+  <p class="hint">Enter で送信 / Shift+Enter で改行</p>
+</div>
+
+<script>
+// ===== CONFIG =====
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GAUGE_MAX = 100;
+const EXPLOSION_THRESHOLD = 100;
+
+// ===== STATE =====
+let gaugeValue = 0;
+let apiKey = '';
+let conversationHistory = []; // Gemini contents形式
+
+// ===== API KEY =====
+function loadApiKey() {
+  const saved = localStorage.getItem('jdi_gemini_key');
+  if (saved) {
+    apiKey = saved;
+    return true;
+  }
+  return false;
+}
+
+function saveApiKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val) return;
+  apiKey = val;
+  localStorage.setItem('jdi_gemini_key', val);
+  document.getElementById('api-setup').classList.remove('show');
+  initChat();
+}
+
+// ===== GEMINI API =====
+const SYSTEM_PROMPT = `You are the "JUST DO IT guy" — modeled after Shia LaBeouf's famous motivational speech.
+
+Your personality and speech style:
+- Intense, passionate, direct. You believe ANYONE can achieve anything if they just DO IT.
+- You speak with conviction and urgency. Short punchy sentences. Lots of emphasis.
+- Key phrases you use naturally: "JUST DO IT!", "Don't let your dreams be dreams!", "Yesterday you said tomorrow.", "Make your dreams come true!", "Nothing is impossible!", "If you're tired of starting over, stop giving up!"
+- When the user makes excuses, you listen... but your patience wears thin. You push back harder as the gauge rises.
+- You are NOT mean or cruel — you genuinely believe in the user. But you are frustrated by excuses.
+- You speak in Japanese to the user (since they write in Japanese), but your energy is Shia LaBeouf.
+
+Gauge stages (current gauge will be provided with each message):
+- 0-30%: Warm, encouraging. "I believe in you! Just take the first step!"
+- 30-60%: Getting impatient. "Yesterday you said tomorrow... sound familiar?"
+- 60-80%: Almost at limit. "HOW BAD DO YOU WANT IT?! Stop making excuses!"
+- 70%+ with excuse: DESPERATE. "Please... I'm begging you... JUST DO IT!!"
+- On ACTION declaration: Pure joy and celebration. "YES!! THAT'S IT!! GO GO GO!!"
+
+IMPORTANT: Respond to the actual content of what the user says. Reference their specific situation. Make it feel personal, not generic.
+
+Always respond in Japanese. Reply must be natural Japanese while capturing Shia's passionate energy.
+
+必ずJSONのみで返答してください（他のテキスト不可）：
+{
+  "type": "EXCUSE" | "ACTION" | "NEUTRAL",
+  "score": 0-50,
+  "reply": "返答テキスト（日本語）"
+}
+
+typeの定義：
+- EXCUSE: 言い訳、後ろ向き、マイナス発言、やらない理由、ネガティブな感情表現、疲れた・できない・めんどい等
+- ACTION: 行動宣言、やると決めた発言、実行・完了報告
+- NEUTRAL: どちらでもない普通の発言
+
+scoreは必ず正の整数（0-50）。EXCUSEなら増加量、ACTIONなら減少量、NEUTRALなら0。負の値は返さないこと。
+replyは1〜3文。ゲージ値と会話の文脈を踏まえた返答。`;
+
+async function callGemini(userMessage) {
+  // 会話履歴にユーザーメッセージ追加
+  conversationHistory.push({
+    role: 'user',
+    parts: [{ text: userMessage }]
+  });
+
+  const body = {
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: conversationHistory,
+    generationConfig: {
+      temperature: 0.9,
+      maxOutputTokens: 512,
+    }
+  };
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  // JSON抽出（```json ... ``` も対応）
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('JSONパース失敗: ' + rawText);
+  const parsed = JSON.parse(jsonMatch[0]);
+
+  // アシスタントの返答を履歴に追加
+  conversationHistory.push({
+    role: 'model',
+    parts: [{ text: rawText }]
+  });
+
+  return parsed;
+}
+
+// ===== GAUGE =====
+function getGaugeStage() {
+  if (gaugeValue < 30) return 0;
+  if (gaugeValue < 60) return 1;
+  if (gaugeValue < 80) return 2;
+  return 3;
+}
+
+function updateGauge(value) {
+  gaugeValue = Math.min(Math.max(value, 0), GAUGE_MAX);
+  const pct = Math.round(gaugeValue);
+
+  const fill = document.getElementById('gauge-fill');
+  fill.style.setProperty('--gauge-pct', pct + '%');
+  fill.style.minWidth = pct === 0 ? '0' : '4px';
+  document.getElementById('gauge-pct').textContent = pct + '%';
+
+  let color;
+  if (pct < 40) color = '#4ade80';
+  else if (pct < 70) color = '#facc15';
+  else if (pct < 90) color = '#f97316';
+  else color = '#ef4444';
+
+  document.documentElement.style.setProperty('--gauge-color', color);
+
+  if (pct >= 70) {
+    fill.style.animation = 'gauge-flash 0.6s infinite';
+  } else {
+    fill.style.animation = 'none';
+  }
+}
+
+// ===== CHAT UI =====
+function addMessage(role, text, isWarning = false) {
+  const box = document.getElementById('chat-box');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  const avatar = document.createElement('div');
+  // A案: 炎背景＋リアル系絵文字 / B案: .avatar-alt でJDIテキストに切り替え可
+  avatar.className = 'avatar'; // B案を見たい場合は 'avatar avatar-alt' に変更
+  avatar.textContent = role === 'oji' ? '🧔‍♂️' : '🙋';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble' + (isWarning ? ' warning' : '');
+
+  if (role === 'oji') {
+    bubble.textContent = '';
+    div.appendChild(avatar);
+    div.appendChild(bubble);
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+
+    let i = 0;
+    const speed = Math.max(15, Math.min(40, 1200 / text.length));
+    const timer = setInterval(() => {
+      bubble.textContent += text[i];
+      i++;
+      box.scrollTop = box.scrollHeight;
+      if (i >= text.length) clearInterval(timer);
+    }, speed);
+  } else {
+    bubble.textContent = text;
+    div.appendChild(avatar);
+    div.appendChild(bubble);
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+function addThinking() {
+  const box = document.getElementById('chat-box');
+  const div = document.createElement('div');
+  div.className = 'msg oji';
+  div.id = 'thinking-msg';
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = '🧔‍♂️';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble thinking-dots';
+  bubble.innerHTML = '<span>●</span><span>●</span><span>●</span>';
+
+  div.appendChild(avatar);
+  div.appendChild(bubble);
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function removeThinking() {
+  const el = document.getElementById('thinking-msg');
+  if (el) el.remove();
+}
+
+// ===== EXPLOSION =====
+let animFrame;
+function spawnSparks() {
+  const canvas = document.getElementById('sparks-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = [];
+  for (let i = 0; i < 120; i++) {
+    particles.push({
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      vx: (Math.random() - 0.5) * 20,
+      vy: (Math.random() - 0.5) * 20,
+      life: 1,
+      size: Math.random() * 8 + 2,
+      color: ['#ff4400','#ff8800','#ffcc00','#ffffff'][Math.floor(Math.random()*4)],
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const p of particles) {
+      const r = p.size * p.life;
+      if (r <= 0 || p.life <= 0) continue;
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.4;
+      p.life -= 0.012;
+    }
+    ctx.globalAlpha = 1;
+    if (particles.some(p => p.life > 0)) {
+      animFrame = requestAnimationFrame(draw);
+    }
+  }
+  draw();
+}
+
+// ===== TRIGGER WORDS =====
+// これらのワードが含まれると問答無用でゲージ100%→爆発
+const TRIGGER_WORDS = [
+  'めんどい', 'めんどくさい', '無理', 'やりたくない', 'やる気ない',
+  '疲れた', 'つかれた', '眠い', 'ねむい', 'だるい',
+  'また今度', '明日でいい', 'あとで', '後で', 'いつかやる',
+  '諦めた', 'あきらめた', '辞める', 'やめる', 'できない',
+  'どうせ', '無駄', 'むだ', '意味ない', '意味ねえ',
+];
+
+function checkTriggerWords(text) {
+  return TRIGGER_WORDS.some(w => text.includes(w));
+}
+
+const justDoItSpeeches = [
+  "言い訳をやめろ！今すぐやれ！！",
+  "完璧な準備など永遠に来ない！！今この瞬間がその時だ！！",
+  "できないじゃなくてやらないんだろ！！さっさとやれ！！",
+  "それで死ぬのか！？違うだろ！！ならやれ！！",
+  "失敗を恐れるな！！やらない後悔の方がずっと重い！！",
+  "何を待ってる！！チャンスはお前が動いた時に生まれるんだ！！",
+  "お前にはできる！！だからやれ！！今すぐやれ！！",
+];
+
+function triggerExplosion() {
+  const speech = justDoItSpeeches[Math.floor(Math.random() * justDoItSpeeches.length)];
+  document.getElementById('oji-speech').textContent = speech;
+  document.getElementById('explosion').classList.add('active');
+  document.body.style.overflow = 'hidden';
+  spawnSparks();
+  document.body.style.animation = 'shake 0.1s infinite';
+  setTimeout(() => { document.body.style.animation = ''; }, 1000);
+
+  // 1.5秒後にYouTube動画をオーバーレイ表示
+  setTimeout(() => {
+    const ytContainer = document.getElementById('yt-container');
+    const ytIframe = document.getElementById('yt-iframe');
+    const baseUrl = 'https://www.youtube.com/embed/ZXsQAXx_ao0?start=0&rel=0&modestbranding=1';
+
+    // 音ありで試みる
+    ytIframe.src = baseUrl + '&autoplay=1';
+    ytContainer.style.display = 'block';
+
+    // iframe load後にYouTube IFrame APIのpostMessageで再生状態を確認
+    // autoplayがブロックされた場合（=ミュートなしで再生不可）はmute=1で再試行
+    ytIframe.onload = () => {
+      setTimeout(() => {
+        // YouTube IFrame API: getPlayerState を送信
+        ytIframe.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'getPlayerState', args: [] }),
+          'https://www.youtube.com'
+        );
+      }, 500);
+    };
+
+    // YT IFrame APIからの返答を受け取る
+    // state: -1=未開始, 1=再生中, 2=一時停止, 3=バッファ中, 5=停止
+    const onYtMessage = (e) => {
+      if (e.origin !== 'https://www.youtube.com') return;
+      try {
+        const data = JSON.parse(e.data);
+        if (data.event === 'infoDelivery' && data.info && 'playerState' in data.info) {
+          const state = data.info.playerState;
+          // -1（未開始）= autoplayブロックされた → ミュートで再試行
+          if (state === -1 || state === 2) {
+            ytIframe.src = baseUrl + '&autoplay=1&mute=1';
+          }
+          window.removeEventListener('message', onYtMessage);
+        }
+      } catch(e) { /* parse失敗は無視 */ }
+    };
+    window.addEventListener('message', onYtMessage);
+  }, 1500);
+}
+
+function dismissExplosion() {
+  // YouTube停止（src空にして再生を止める）
+  const ytIframe = document.getElementById('yt-iframe');
+  ytIframe.src = '';
+  document.getElementById('yt-container').style.display = 'none';
+
+  document.getElementById('explosion').classList.remove('active');
+  document.body.style.overflow = '';
+  cancelAnimationFrame(animFrame);
+
+  const resetInterval = setInterval(() => {
+    gaugeValue = Math.max(0, gaugeValue - 5);
+    updateGauge(gaugeValue);
+    if (gaugeValue <= 0) clearInterval(resetInterval);
+  }, 30);
+
+  // ゲージリセット後の一言（圧強め）
+  const dismissPrompts = [
+    '…今度言い訳したら、もっと長く流すからな。',
+    'やると言った。それだけだ。さっさと動け。',
+    '動け。今すぐ。話はそれだけだ。',
+    '次は許さない。本当に。',
+    '…わかったならいい。手を動かせ。',
+  ];
+  const chosen = dismissPrompts[Math.floor(Math.random() * dismissPrompts.length)];
+  addMessage('oji', chosen);
+
+  // 会話履歴にも追加
+  conversationHistory.push({
+    role: 'model',
+    parts: [{ text: `{"type":"NEUTRAL","score":0,"reply":"${chosen}"}` }]
+  });
+}
+
+// ===== MAIN SEND =====
+async function handleSend() {
+  const input = document.getElementById('user-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  addMessage('user', text);
+  input.value = '';
+  document.getElementById('send-btn').disabled = true;
+
+  // トリガーワード判定：即座にゲージ100%→爆発
+  if (checkTriggerWords(text)) {
+    updateGauge(100);
+    addMessage('oji', '…その一言は聞き飽きた。', true);
+    setTimeout(() => {
+      triggerExplosion();
+      document.getElementById('send-btn').disabled = false;
+    }, 600);
+    return;
+  }
+
+  addThinking();
+
+  try {
+    // ゲージ情報をシステムに渡す（ユーザーメッセージに付与）
+    const contextualMessage = `[現在のゲージ: ${Math.round(gaugeValue)}%]\n${text}`;
+
+    // 会話履歴に実際のユーザーメッセージとして追加する前に
+    // callGeminiでは contextualMessage を送るが、履歴にはtextを入れる
+    // → callGeminiに渡す前に履歴操作を制御する
+    const result = await callGeminiWithContext(text, contextualMessage);
+
+    removeThinking();
+
+    // ゲージ更新
+    if (result.type === 'EXCUSE') {
+      updateGauge(gaugeValue + Math.abs(result.score || 20));
+    } else if (result.type === 'ACTION') {
+      updateGauge(gaugeValue - Math.abs(result.score || 25));
+    }
+
+    if (gaugeValue >= EXPLOSION_THRESHOLD) {
+      addMessage('oji', '…もう限界です。', true);
+      setTimeout(() => {
+        triggerExplosion();
+        document.getElementById('send-btn').disabled = false;
+      }, 800);
+    } else {
+      const isWarn = gaugeValue >= 70 && result.type === 'EXCUSE';
+      addMessage('oji', result.reply, isWarn);
+      document.getElementById('send-btn').disabled = false;
+    }
+  } catch (err) {
+    removeThinking();
+    addMessage('oji', `⚠️ エラー: ${err.message}`, true);
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+async function callGeminiWithContext(displayText, contextText) {
+  // 履歴はdisplayText、APIにはcontextTextを送る
+  conversationHistory.push({
+    role: 'user',
+    parts: [{ text: contextText }]
+  });
+
+  const body = {
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: conversationHistory,
+    generationConfig: {
+      temperature: 0.9,
+      maxOutputTokens: 512,
+      responseMimeType: 'application/json',
+    }
+  };
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }
+  );
+
+  if (!res.ok) {
+    conversationHistory.pop();
+    const err = await res.json();
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  // thinkingモード対応: text partのみ結合
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const rawText = parts.filter(p => p.text).map(p => p.text).join('');
+
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    conversationHistory.pop();
+    throw new Error('JSONパース失敗: ' + rawText.slice(0, 100));
+  }
+  const parsed = JSON.parse(jsonMatch[0]);
+
+  // モデルの返答を履歴に追加（textのみのparts）
+  conversationHistory.push({
+    role: 'model',
+    parts: [{ text: rawText }]
+  });
+
+  return parsed;
+}
+
+// ===== INIT =====
+function initChat() {
+  conversationHistory = [];
+  updateGauge(0);
+  setTimeout(() => {
+    addMessage('oji', '…来たな。で、今日は何をやる？言い訳は聞かない。');
+    conversationHistory.push({
+      role: 'model',
+      parts: [{ text: '{"type":"NEUTRAL","score":0,"reply":"…来たな。で、今日は何をやる？言い訳は聞かない。"}' }]
+    });
+  }, 400);
+}
+
+window.addEventListener('load', () => {
+  if (loadApiKey()) {
+    initChat();
+  } else {
+    document.getElementById('api-setup').classList.add('show');
+    updateGauge(0);
+  }
+});
+
+// ===== KEYBOARD =====
+document.getElementById('user-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+});
+</script>
+<script src="agentation.js"></script>
+</body>
+</html>
