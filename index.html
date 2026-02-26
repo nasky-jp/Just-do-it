@@ -782,6 +782,7 @@ async function callGeminiWithContext(displayText, contextText) {
   });
 
   // APIキーはサーバーサイド（/api/chat）で管理
+  // サーバーが {type, score, reply, rawText} をパース済みで返す
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -797,20 +798,17 @@ async function callGeminiWithContext(displayText, contextText) {
     throw new Error(err.error || `HTTP ${res.status}`);
   }
 
-  const data = await res.json();
-  const parts = data.candidates?.[0]?.content?.parts || [];
-  const rawText = parts.filter(p => p.text).map(p => p.text).join('');
+  const parsed = await res.json();
 
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
+  if (!parsed.reply) {
     conversationHistory.pop();
-    throw new Error('JSONパース失敗: ' + rawText.slice(0, 100));
+    throw new Error('モデルから有効な返答が得られませんでした');
   }
-  const parsed = JSON.parse(jsonMatch[0]);
 
+  // モデルの返答を履歴に追加
   conversationHistory.push({
     role: 'model',
-    parts: [{ text: rawText }]
+    parts: [{ text: parsed.rawText || JSON.stringify(parsed) }]
   });
 
   return parsed;
