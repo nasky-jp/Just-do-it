@@ -130,22 +130,51 @@
 
     /* ======= API KEY SETUP（削除済み：サーバーサイドで管理） ======= */
 
-    /* ======= SHIA CANVAS ======= */
-    #shia-canvas {
+    /* ======= GAUGE POPUP ======= */
+    .gauge-popup {
       position: fixed;
-      bottom: 0;
-      right: 0;
-      width: 260px;
-      height: 360px;
+      left: 50%;
+      bottom: 120px;
+      transform: translateX(-50%) translateY(0);
       pointer-events: none;
-      z-index: 50;
-      opacity: 0;
-      transform: translateX(40px);
-      transition: opacity 0.8s ease, transform 0.8s ease;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      animation: popup-rise 1.6s ease forwards;
     }
-    #shia-canvas.visible {
-      opacity: 1;
-      transform: translateX(0);
+    .gauge-popup .popup-pct {
+      font-size: clamp(28px, 6vw, 48px);
+      font-weight: 900;
+      font-family: 'Arial Black', sans-serif;
+      letter-spacing: 2px;
+      color: #fff;
+      text-shadow:
+        0 0 10px currentColor,
+        0 0 30px currentColor,
+        2px 2px 0 rgba(0,0,0,0.6);
+      white-space: nowrap;
+    }
+    .gauge-popup.excuse .popup-pct { color: #ff4400; }
+    .gauge-popup.action  .popup-pct { color: #4ade80; }
+
+    .gauge-popup .popup-phrase {
+      font-size: clamp(13px, 3vw, 18px);
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #ffcc00;
+      text-shadow: 0 0 10px #ff8800, 0 0 30px #ff4400;
+      white-space: nowrap;
+    }
+
+    @keyframes popup-rise {
+      0%   { opacity: 0;   transform: translateX(-50%) translateY(20px) scale(0.6); }
+      15%  { opacity: 1;   transform: translateX(-50%) translateY(0px)  scale(1.15); }
+      30%  { opacity: 1;   transform: translateX(-50%) translateY(0px)  scale(1); }
+      70%  { opacity: 1;   transform: translateX(-50%) translateY(-10px) scale(1); }
+      100% { opacity: 0;   transform: translateX(-50%) translateY(-40px) scale(0.9); }
     }
 
     /* ======= GAUGE ======= */
@@ -380,12 +409,6 @@
 </head>
 <body>
 
-<!-- ===== SHIA CHROMA KEY ===== -->
-<!-- video要素は非表示・canvasへの描画ソースとして使用 -->
-<video id="shia-video" src="shia.mp4" muted playsinline loop
-  style="display:none; position:absolute; pointer-events:none;"></video>
-<canvas id="shia-canvas"></canvas>
-
 <!-- ===== EXPLOSION ===== -->
 <div id="explosion">
   <canvas id="sparks-canvas" class="sparks"></canvas>
@@ -521,9 +544,6 @@ function updateGauge(value) {
   } else {
     fill.style.animation = 'none';
   }
-
-  // ゲージ60%以上でShia登場・60%未満で退場
-  if (window.updateShiaVisibility) window.updateShiaVisibility(pct);
 }
 
 // ===== CHAT UI =====
@@ -754,7 +774,9 @@ async function handleSend() {
 
   // トリガーワード判定：即座にゲージ100%→爆発
   if (checkTriggerWords(text)) {
+    const triggerDelta = 100 - gaugeValue;
     updateGauge(100);
+    showGaugePopup(triggerDelta, 'EXCUSE');
     addMessage('oji', '…その一言は聞き飽きた。', true);
     setTimeout(() => {
       triggerExplosion();
@@ -776,11 +798,15 @@ async function handleSend() {
 
     removeThinking();
 
-    // ゲージ更新
+    // ゲージ更新 + ポップアップ表示
     if (result.type === 'EXCUSE') {
-      updateGauge(gaugeValue + Math.abs(result.score || 20));
+      const delta = Math.abs(result.score || 20);
+      updateGauge(gaugeValue + delta);
+      showGaugePopup(delta, 'EXCUSE');
     } else if (result.type === 'ACTION') {
-      updateGauge(gaugeValue - Math.abs(result.score || 25));
+      const delta = Math.abs(result.score || 25);
+      updateGauge(gaugeValue - delta);
+      showGaugePopup(delta, 'ACTION');
     }
 
     if (gaugeValue >= EXPLOSION_THRESHOLD) {
@@ -841,79 +867,46 @@ async function callGeminiWithContext(displayText, contextText) {
   return parsed;
 }
 
-// ===== SHIA CHROMA KEY =====
-(function() {
-  const video  = document.getElementById('shia-video');
-  const canvas = document.getElementById('shia-canvas');
-  const ctx    = canvas.getContext('2d', { willReadFrequently: true });
+// ===== GAUGE POPUP =====
+const EXCUSE_PHRASES = [
+  'JUST DO IT!!', "DON'T LET YOUR DREAMS BE DREAMS!", 'YESTERDAY YOU SAID TOMORROW.',
+  'NOTHING IS IMPOSSIBLE!', 'MAKE YOUR DREAMS COME TRUE!',
+];
+const ACTION_PHRASES = [
+  'YES!! GO GO GO!!', "THAT'S IT!!", 'KEEP GOING!!', 'YOU DID IT!!', 'AMAZING!!',
+];
 
-  // canvas解像度をCSS表示サイズに合わせる
-  canvas.width  = 260;
-  canvas.height = 360;
+function showGaugePopup(delta, type) {
+  if (delta === 0) return;
 
-  // グリーンバック除去の閾値（緑チャンネルが赤・青より突出している部分を透過）
-  function chromaKey(imageData) {
-    const d = imageData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const r = d[i], g = d[i + 1], b = d[i + 2];
-      // 緑が支配的かつ一定の輝度以上のピクセルを透過
-      if (g > 80 && g > r * 1.3 && g > b * 1.3) {
-        d[i + 3] = 0; // alpha = 0（透明）
-      } else if (g > 60 && g > r * 1.1 && g > b * 1.1) {
-        // エッジをなめらかにするため半透明
-        d[i + 3] = Math.round(d[i + 3] * ((g - 60) / 20 < 1 ? (g - 60) / 20 : 1) * 0.5);
-      }
-    }
-    return imageData;
+  // 既存ポップアップを即削除
+  document.querySelectorAll('.gauge-popup').forEach(el => el.remove());
+
+  const popup = document.createElement('div');
+  popup.className = `gauge-popup ${type === 'EXCUSE' ? 'excuse' : type === 'ACTION' ? 'action' : ''}`;
+
+  // パーセンテージ表示
+  const pctEl = document.createElement('div');
+  pctEl.className = 'popup-pct';
+  const sign = type === 'ACTION' ? '−' : '+';
+  pctEl.textContent = `${sign}${delta}%`;
+
+  popup.appendChild(pctEl);
+
+  // EXCUSEかACTIONのときだけフレーズを出す
+  if (type === 'EXCUSE' || type === 'ACTION') {
+    const phrases = type === 'EXCUSE' ? EXCUSE_PHRASES : ACTION_PHRASES;
+    const phraseEl = document.createElement('div');
+    phraseEl.className = 'popup-phrase';
+    phraseEl.textContent = phrases[Math.floor(Math.random() * phrases.length)];
+    popup.appendChild(phraseEl);
   }
 
-  let shiaRafId = null;
+  document.body.appendChild(popup);
 
-  function drawFrame() {
-    if (video.paused || video.ended) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    chromaKey(frame);
-    ctx.putImageData(frame, 0, 0);
-    shiaRafId = requestAnimationFrame(drawFrame);
-  }
-
-  function startShia() {
-    video.play().then(() => {
-      canvas.classList.add('visible');
-      drawFrame();
-    }).catch(() => {
-      // autoplay blocked: ユーザー操作後に再試行
-      document.addEventListener('click', () => {
-        video.play().then(() => {
-          canvas.classList.add('visible');
-          drawFrame();
-        });
-      }, { once: true });
-    });
-  }
-
-  function stopShia() {
-    canvas.classList.remove('visible');
-    if (shiaRafId) cancelAnimationFrame(shiaRafId);
-    video.pause();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
-
-  // ゲージに応じてShiaの表示/非表示を切り替え（外部から呼べるようにグローバル公開）
-  window.updateShiaVisibility = function(gauge) {
-    if (gauge >= 60) {
-      if (video.paused) startShia();
-    } else {
-      if (!video.paused) stopShia();
-    }
-  };
-
-  // ページ読み込み後1秒でぬるっと登場（初回）
-  window.addEventListener('load', () => {
-    setTimeout(startShia, 1000);
-  });
-})();
+  // アニメーション終了後に削除
+  popup.addEventListener('animationend', () => popup.remove());
+}
 
 // ===== INIT =====
 function initChat() {
