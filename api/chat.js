@@ -39,8 +39,15 @@ export default async function handler(req, res) {
     );
 
     if (!upstream.ok) {
-      const err = await upstream.json();
-      return res.status(upstream.status).json({ error: err.error?.message || 'Upstream error' });
+      let errMsg = 'Upstream error';
+      try {
+        const err = await upstream.json();
+        errMsg = err.error?.message || errMsg;
+      } catch (_) {}
+      // クォータ/レート制限は 429 で返ってくる
+      // フロント側がエラーメッセージ文字列でキャラクター発言に振り分けるため
+      // ステータスコードをそのまま転送する
+      return res.status(upstream.status).json({ error: errMsg });
     }
 
     const data = await upstream.json();

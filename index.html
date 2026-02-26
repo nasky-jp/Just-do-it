@@ -5,23 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JUST DO IT.</title>
   <style>
+    /* ===== FONTS ===== */
+    @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap');
+
     :root {
-      --gauge-color: #4ade80;
+      --ink: #1a1a2e;
+      --panel: #fffbe8;
+      --panel2: #fff5f0;
+      --red: #e63946;
+      --orange: #ff7f11;
+      --yellow: #ffd60a;
+      --blue: #4361ee;
+      --green: #06d6a0;
+      --border: 3px solid var(--ink);
+      --border-thick: 5px solid var(--ink);
+      --shadow: 4px 4px 0px var(--ink);
+      --shadow-lg: 6px 6px 0px var(--ink);
+      --font-main: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic Pro', sans-serif;
+      --gauge-color: #06d6a0;
       --gauge-pct: 0%;
-      --bg: #0f0f1a;
-      --surface: #1a1a2e;
-      --border: #2a2a4a;
-      --text: #e2e8f0;
-      --muted: #64748b;
-      --accent: #6366f1;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+      background: var(--yellow);
+      background-image:
+        radial-gradient(circle at 10px 10px, rgba(0,0,0,0.05) 1px, transparent 0),
+        radial-gradient(circle at 30px 30px, rgba(0,0,0,0.03) 1px, transparent 0);
+      background-size: 40px 40px;
+      color: var(--ink);
+      font-family: var(--font-main);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -30,12 +44,14 @@
       padding: 16px;
     }
 
-    /* ======= EXPLOSION OVERLAY ======= */
+    /* ===== EXPLOSION OVERLAY ===== */
     #explosion {
       display: none;
       position: fixed;
       inset: 0;
-      background: #000;
+      background: var(--red);
+      background-image:
+        repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.05) 20px, rgba(255,255,255,0.05) 40px);
       z-index: 100;
       flex-direction: column;
       align-items: center;
@@ -44,93 +60,191 @@
     }
     #explosion.active { display: flex; }
 
-    .shia-face {
-      font-size: clamp(80px, 20vw, 160px);
-      animation: shake 0.15s infinite;
-      filter: drop-shadow(0 0 40px #ff4400);
-      margin-bottom: 16px;
-    }
-
-    .just-do-it-text {
-      font-size: clamp(36px, 10vw, 96px);
-      font-weight: 900;
-      letter-spacing: 4px;
-      color: #fff;
-      text-shadow:
-        0 0 20px #ff4400,
-        0 0 60px #ff8800,
-        0 0 100px #ffaa00;
-      animation: pulse-text 0.3s infinite alternate;
-      text-align: center;
-      line-height: 1.1;
-    }
-
-    .oji-speech {
-      font-size: clamp(16px, 4vw, 28px);
-      color: #ffdd44;
-      margin-top: 24px;
-      text-align: center;
-      padding: 0 24px;
-      animation: fade-bounce 0.5s ease;
-      font-weight: bold;
-      text-shadow: 0 0 10px #ff8800;
-    }
-
-    .sparks {
+    /* 爆発背景 斜めスピード線 */
+    .speed-lines {
       position: absolute;
       inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .speed-lines::before,
+    .speed-lines::after {
+      content: '';
+      position: absolute;
+      inset: -100%;
+      background: repeating-conic-gradient(
+        rgba(255,255,255,0.12) 0deg,
+        transparent 1deg,
+        transparent 8deg,
+        rgba(255,255,255,0.08) 9deg,
+        transparent 10deg
+      );
+      animation: spin-lines 4s linear infinite;
+    }
+    .speed-lines::after {
+      animation-direction: reverse;
+      animation-duration: 6s;
+      opacity: 0.5;
+    }
+    @keyframes spin-lines {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* 爆発エフェクト文字 */
+    .explosion-title {
+      position: relative;
+      z-index: 2;
+      font-size: clamp(48px, 12vw, 120px);
+      font-weight: 900;
+      color: #fff;
+      font-family: var(--font-main);
+      text-align: center;
+      line-height: 1;
+      letter-spacing: 2px;
+      /* マンガ風テキストシャドウ（黒縁取り）*/
+      -webkit-text-stroke: 4px var(--ink);
+      text-shadow:
+        6px 6px 0px var(--ink),
+        -2px -2px 0px var(--ink);
+      animation: jdi-bounce 0.3s ease infinite alternate;
+    }
+    @keyframes jdi-bounce {
+      from { transform: scale(1) rotate(-1deg); }
+      to { transform: scale(1.04) rotate(1deg); }
+    }
+
+    /* shia canvas (爆発時) */
+    #shia-canvas-explosion {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: min(50vw, 400px);
+      height: min(75vh, 600px);
+      z-index: 1;
       pointer-events: none;
     }
 
-    #dismiss-btn {
-      margin-top: 40px;
-      padding: 14px 48px;
-      background: transparent;
-      border: 2px solid #ff4400;
-      color: #ff4400;
-      font-size: 18px;
-      font-weight: bold;
-      border-radius: 8px;
-      cursor: pointer;
-      letter-spacing: 2px;
-      transition: all 0.2s;
+    /* 爆発時の吹き出し */
+    .explosion-speech {
+      position: relative;
+      z-index: 3;
+      background: #fff;
+      border: var(--border-thick);
+      border-radius: 20px;
+      padding: 14px 24px;
+      margin: 16px 24px;
+      font-size: clamp(14px, 3.5vw, 22px);
+      font-weight: 900;
+      color: var(--ink);
+      max-width: 500px;
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+      /* 吹き出し三角 */
+      position: relative;
     }
-    #dismiss-btn:hover {
-      background: #ff4400;
-      color: #fff;
-      box-shadow: 0 0 30px #ff4400;
+    .explosion-speech::before {
+      content: '';
+      position: absolute;
+      bottom: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 11px solid transparent;
+      border-top: 11px solid var(--ink);
+    }
+    .explosion-speech::after {
+      content: '';
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 9px solid transparent;
+      border-top: 9px solid #fff;
     }
 
-    /* ======= MAIN UI ======= */
+    #dismiss-btn {
+      position: relative;
+      z-index: 3;
+      margin-top: 32px;
+      padding: 14px 40px;
+      background: var(--yellow);
+      border: var(--border-thick);
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 900;
+      font-family: var(--font-main);
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: var(--shadow-lg);
+      transition: transform 0.1s, box-shadow 0.1s;
+      letter-spacing: 1px;
+    }
+    #dismiss-btn:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0px var(--ink);
+    }
+    #dismiss-btn:active {
+      transform: translate(4px, 4px);
+      box-shadow: none;
+    }
+
+    #sparks-canvas {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    /* ===== MAIN WRAPPER ===== */
     .wrapper {
       width: 100%;
       max-width: 680px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      position: relative;
     }
 
+    /* ===== HEADER ===== */
     .header {
       text-align: center;
       padding: 8px 0 4px;
+      position: relative;
     }
     .header h1 {
-      font-size: clamp(24px, 6vw, 36px);
+      font-size: clamp(28px, 8vw, 56px);
       font-weight: 900;
+      color: var(--ink);
+      font-family: var(--font-main);
+      -webkit-text-stroke: 2px var(--ink);
+      /* マンガ風白縁取り */
+      text-shadow:
+        3px 3px 0 var(--red),
+        -1px -1px 0 var(--ink),
+        1px -1px 0 var(--ink),
+        -1px 1px 0 var(--ink);
       letter-spacing: 4px;
-      color: #fff;
-      text-shadow: 0 0 20px rgba(255,68,0,0.4);
-      font-family: 'Arial Black', 'Segoe UI', sans-serif;
+      line-height: 1;
+      animation: title-wiggle 2s ease infinite;
+    }
+    @keyframes title-wiggle {
+      0%,100% { transform: rotate(-0.5deg); }
+      50% { transform: rotate(0.5deg); }
     }
     .header .subtitle {
       font-size: 13px;
-      color: var(--muted);
-      margin-top: 4px;
+      color: var(--ink);
+      margin-top: 6px;
+      font-weight: 700;
+      opacity: 0.7;
+      background: #fff;
+      display: inline-block;
+      padding: 2px 12px;
+      border: 2px solid var(--ink);
+      border-radius: 99px;
     }
 
-    /* ======= API KEY SETUP（削除済み：サーバーサイドで管理） ======= */
-
-    /* ======= GAUGE POPUP ======= */
+    /* ===== GAUGE POPUP ===== */
     .gauge-popup {
       position: fixed;
       left: 50%;
@@ -141,48 +255,65 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
-      animation: popup-rise 1.6s ease forwards;
+      gap: 4px;
+      animation: popup-rise 1.8s ease forwards;
     }
     .gauge-popup .popup-pct {
-      font-size: clamp(28px, 6vw, 48px);
+      font-size: clamp(32px, 7vw, 56px);
       font-weight: 900;
-      font-family: 'Arial Black', sans-serif;
-      letter-spacing: 2px;
-      color: #fff;
-      text-shadow:
-        0 0 10px currentColor,
-        0 0 30px currentColor,
-        2px 2px 0 rgba(0,0,0,0.6);
+      font-family: var(--font-main);
+      -webkit-text-stroke: 3px var(--ink);
+      text-shadow: 4px 4px 0 var(--ink);
       white-space: nowrap;
+      color: #fff;
     }
-    .gauge-popup.excuse .popup-pct { color: #ff4400; }
-    .gauge-popup.action  .popup-pct { color: #4ade80; }
+    .gauge-popup.excuse .popup-pct { color: var(--red); }
+    .gauge-popup.action  .popup-pct { color: var(--green); }
 
     .gauge-popup .popup-phrase {
-      font-size: clamp(13px, 3vw, 18px);
-      font-weight: 700;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: #ffcc00;
-      text-shadow: 0 0 10px #ff8800, 0 0 30px #ff4400;
+      background: var(--ink);
+      color: var(--yellow);
+      font-size: clamp(11px, 2.5vw, 16px);
+      font-weight: 900;
+      letter-spacing: 2px;
+      padding: 3px 14px;
+      border-radius: 4px;
       white-space: nowrap;
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
     }
 
     @keyframes popup-rise {
-      0%   { opacity: 0;   transform: translateX(-50%) translateY(20px) scale(0.6); }
-      15%  { opacity: 1;   transform: translateX(-50%) translateY(0px)  scale(1.15); }
-      30%  { opacity: 1;   transform: translateX(-50%) translateY(0px)  scale(1); }
-      70%  { opacity: 1;   transform: translateX(-50%) translateY(-10px) scale(1); }
-      100% { opacity: 0;   transform: translateX(-50%) translateY(-40px) scale(0.9); }
+      0%   { opacity: 0;   transform: translateX(-50%) translateY(20px) scale(0.5); }
+      12%  { opacity: 1;   transform: translateX(-50%) translateY(0px)  scale(1.2); }
+      25%  { opacity: 1;   transform: translateX(-50%) translateY(0px)  scale(1); }
+      70%  { opacity: 1;   transform: translateX(-50%) translateY(-15px) scale(1); }
+      100% { opacity: 0;   transform: translateX(-50%) translateY(-50px) scale(0.8); }
     }
 
-    /* ======= GAUGE ======= */
+    /* shia canvas (コメント時チラ見せ) */
+    #shia-canvas-comment {
+      position: fixed;
+      bottom: 0;
+      right: -200px;
+      width: min(35vw, 280px);
+      height: min(52vw, 420px);
+      z-index: 190;
+      pointer-events: none;
+      opacity: 0;
+      transition: right 0.4s cubic-bezier(.34,1.56,.64,1), opacity 0.3s;
+    }
+    #shia-canvas-comment.visible {
+      right: 0;
+      opacity: 1;
+    }
+
+    /* ===== GAUGE SECTION ===== */
     .gauge-section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      background: var(--panel);
+      border: var(--border-thick);
+      border-radius: 16px;
       padding: 16px 20px;
+      box-shadow: var(--shadow);
     }
     .gauge-label {
       display: flex;
@@ -190,249 +321,307 @@
       align-items: center;
       margin-bottom: 10px;
     }
-    .gauge-label span {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--muted);
+    .gauge-label .label-text {
+      font-size: 14px;
+      font-weight: 900;
+      color: var(--ink);
       letter-spacing: 1px;
-      text-transform: uppercase;
     }
     .gauge-label .pct {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 18px;
+      font-weight: 900;
       color: var(--gauge-color);
+      -webkit-text-stroke: 1px var(--ink);
+      font-family: var(--font-main);
+      min-width: 52px;
+      text-align: right;
     }
 
     .gauge-bar {
       width: 100%;
-      height: 16px;
-      background: #0f0f1a;
+      height: 22px;
+      background: #fff;
       border-radius: 99px;
       overflow: hidden;
-      border: 1px solid var(--border);
+      border: 3px solid var(--ink);
+      box-shadow: inset 2px 2px 0 rgba(0,0,0,0.1);
     }
     .gauge-fill {
       height: 100%;
       width: var(--gauge-pct);
-      min-width: 4px;
-      background: linear-gradient(90deg, var(--gauge-color), #facc15);
+      min-width: 0;
+      background: linear-gradient(90deg, var(--gauge-color) 0%, var(--yellow) 100%);
       border-radius: 99px;
       transition: width 0.4s cubic-bezier(.4,2,.6,1), background 0.3s;
-      box-shadow: 0 0 10px var(--gauge-color);
     }
 
     .gauge-stages {
       display: flex;
       justify-content: space-between;
-      margin-top: 6px;
+      margin-top: 8px;
     }
     .gauge-stages span {
-      font-size: 10px;
-      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ink);
+      opacity: 0.6;
     }
 
-    /* ======= CHAT ======= */
+    /* ===== CHAT BOX ===== */
     .chat-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      background: var(--panel);
+      border: var(--border-thick);
+      border-radius: 16px;
       height: 320px;
       overflow-y: auto;
       padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
       scroll-behavior: smooth;
+      box-shadow: var(--shadow);
     }
-    .chat-box::-webkit-scrollbar { width: 4px; }
-    .chat-box::-webkit-scrollbar-track { background: transparent; }
-    .chat-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    .chat-box::-webkit-scrollbar { width: 6px; }
+    .chat-box::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 99px; }
+    .chat-box::-webkit-scrollbar-thumb { background: var(--ink); border-radius: 99px; }
 
     .msg {
       display: flex;
       gap: 10px;
-      align-items: flex-start;
-      animation: msg-in 0.25s ease;
+      align-items: flex-end;
+      animation: msg-in 0.2s ease;
     }
     .msg.user { flex-direction: row-reverse; }
 
     .avatar {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-      border: 2px solid var(--border);
-    }
-
-    /* Avatar A: 炎グラデーション＋リアル系絵文字 */
-    .msg.oji .avatar {
-      background: radial-gradient(circle at 60% 35%, #ff8800 0%, #c0392b 55%, #1e293b 100%);
-      border-color: #ff4400;
       font-size: 20px;
-      box-shadow: 0 0 10px rgba(255,68,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.4);
+      flex-shrink: 0;
+      border: 3px solid var(--ink);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+    .msg.oji .avatar {
+      background: radial-gradient(circle at 50% 30%, #ff8c00, #c0392b);
+      font-size: 22px;
+    }
+    .msg.user .avatar {
+      background: var(--blue);
+      color: #fff;
+      font-size: 18px;
     }
 
-    /* Avatar B: JDIテキストスタイル（.avatar-alt クラスで切り替え可） */
-    .msg.oji .avatar.avatar-alt {
-      background: linear-gradient(135deg, #1a0000 0%, #3d0000 100%);
-      border-color: #ff4400;
-      border-width: 2px;
-      font-size: 9px;
-      font-weight: 900;
-      letter-spacing: 0.5px;
-      color: #ff4400;
-      text-shadow: 0 0 6px #ff4400;
-      box-shadow: 0 0 10px rgba(255,68,0,0.4);
-      font-family: 'Arial Black', sans-serif;
-    }
-
-    .msg.user .avatar { background: #312e81; }
-
+    /* マンガ吹き出し */
     .bubble {
-      max-width: 80%;
-      padding: 10px 14px;
-      border-radius: 12px;
+      max-width: 78%;
+      padding: 10px 16px;
+      border-radius: 16px;
       font-size: 14px;
+      font-weight: 700;
       line-height: 1.6;
+      font-family: var(--font-main);
+      position: relative;
+      border: 3px solid var(--ink);
+      box-shadow: 3px 3px 0 var(--ink);
     }
+    /* oji吹き出し（左向き）*/
     .msg.oji .bubble {
-      background: #1e293b;
-      border: 1px solid var(--border);
-      border-top-left-radius: 2px;
-      color: var(--text);
+      background: #fff;
+      color: var(--ink);
+      border-bottom-left-radius: 4px;
     }
-    .msg.oji .bubble.warning {
-      border-color: #f59e0b;
-      background: #1c1500;
-      color: #fbbf24;
+    .msg.oji .bubble::before {
+      content: '';
+      position: absolute;
+      left: -14px;
+      bottom: 10px;
+      border: 7px solid transparent;
+      border-right: 7px solid var(--ink);
     }
-    .msg.user .bubble {
-      background: #312e81;
-      border: 1px solid #4338ca;
-      border-top-right-radius: 2px;
-      color: #e0e7ff;
+    .msg.oji .bubble::after {
+      content: '';
+      position: absolute;
+      left: -9px;
+      bottom: 11px;
+      border: 5px solid transparent;
+      border-right: 5px solid #fff;
     }
 
-    /* ======= THINKING ======= */
+    /* warning吹き出し */
+    .msg.oji .bubble.warning {
+      background: var(--panel2);
+      border-color: var(--red);
+      box-shadow: 3px 3px 0 var(--red);
+      color: var(--red);
+    }
+    .msg.oji .bubble.warning::before { border-right-color: var(--red); }
+    .msg.oji .bubble.warning::after  { border-right-color: var(--panel2); }
+
+    /* user吹き出し（右向き）*/
+    .msg.user .bubble {
+      background: var(--blue);
+      color: #fff;
+      border-color: var(--ink);
+      border-bottom-right-radius: 4px;
+    }
+    .msg.user .bubble::before {
+      content: '';
+      position: absolute;
+      right: -14px;
+      bottom: 10px;
+      border: 7px solid transparent;
+      border-left: 7px solid var(--ink);
+    }
+    .msg.user .bubble::after {
+      content: '';
+      position: absolute;
+      right: -9px;
+      bottom: 11px;
+      border: 5px solid transparent;
+      border-left: 5px solid var(--blue);
+    }
+
+    /* ===== THINKING ===== */
     .thinking-dots span {
       display: inline-block;
       animation: dot-bounce 1s infinite;
-      font-size: 20px;
-      color: var(--muted);
+      font-size: 22px;
     }
     .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
     .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
     @keyframes dot-bounce {
       0%,80%,100% { transform: translateY(0); }
-      40% { transform: translateY(-6px); }
+      40% { transform: translateY(-8px); }
     }
 
-    /* ======= INPUT ======= */
+    /* ===== INPUT AREA ===== */
     .input-area {
       display: flex;
       gap: 10px;
     }
     .input-area textarea {
       flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
+      background: #fff;
+      border: var(--border-thick);
+      border-radius: 12px;
+      color: var(--ink);
       font-size: 14px;
+      font-weight: 700;
+      font-family: var(--font-main);
       padding: 12px 14px;
       resize: none;
       outline: none;
-      font-family: inherit;
       line-height: 1.5;
-      height: 56px;
-      transition: border 0.2s, box-shadow 0.2s;
+      height: 58px;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.15s, transform 0.15s;
     }
     .input-area textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
+      box-shadow: 5px 5px 0 var(--ink);
+      transform: translate(-1px, -1px);
     }
-    .input-area textarea::placeholder { color: var(--muted); }
+    .input-area textarea::placeholder {
+      color: rgba(26,26,46,0.4);
+      font-weight: 700;
+    }
 
     .send-btn {
-      width: 56px;
-      height: 56px;
-      background: var(--accent);
-      border: none;
-      border-radius: 10px;
+      width: 58px;
+      height: 58px;
+      background: var(--red);
+      border: var(--border-thick);
+      border-radius: 12px;
       color: #fff;
-      font-size: 22px;
+      font-size: 24px;
+      font-weight: 900;
       cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+      box-shadow: var(--shadow);
+      transition: transform 0.1s, box-shadow 0.1s;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .send-btn:hover { background: #4f46e5; }
-    .send-btn:active { transform: scale(0.95); }
-    .send-btn:disabled { background: var(--border); cursor: not-allowed; }
+    .send-btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: var(--shadow-lg);
+    }
+    .send-btn:active {
+      transform: translate(3px, 3px);
+      box-shadow: none;
+    }
+    .send-btn:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: 2px 2px 0 var(--ink);
+    }
 
-    /* ======= HINT ======= */
+    /* ===== HINT ===== */
     .hint {
       font-size: 11px;
-      color: var(--muted);
+      font-weight: 700;
+      color: var(--ink);
       text-align: center;
+      opacity: 0.5;
     }
 
-    /* ======= ANIMATIONS ======= */
+    /* ===== ANIMATIONS ===== */
     @keyframes shake {
       0%,100% { transform: translateX(0) rotate(0deg); }
-      25% { transform: translateX(-6px) rotate(-3deg); }
-      75% { transform: translateX(6px) rotate(3deg); }
-    }
-    @keyframes pulse-text {
-      from { transform: scale(1); }
-      to { transform: scale(1.06); }
-    }
-    @keyframes fade-bounce {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+      20% { transform: translateX(-8px) rotate(-3deg); }
+      40% { transform: translateX(8px) rotate(3deg); }
+      60% { transform: translateX(-5px) rotate(-2deg); }
+      80% { transform: translateX(5px) rotate(2deg); }
     }
     @keyframes msg-in {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateY(10px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
     @keyframes gauge-flash {
-      0%,100% { box-shadow: 0 0 10px var(--gauge-color); }
-      50% { box-shadow: 0 0 30px var(--gauge-color), 0 0 60px var(--gauge-color); }
+      0%,100% { filter: none; }
+      50% { filter: brightness(1.3) saturate(1.5); }
+    }
+
+    /* ===== クォータエラー用メッセージスタイル ===== */
+    .msg.oji .bubble.quota {
+      background: #fffbe8;
+      border-color: var(--orange);
+      box-shadow: 3px 3px 0 var(--orange);
+      color: var(--ink);
+    }
+    .msg.oji .bubble.quota::before { border-right-color: var(--orange); }
+    .msg.oji .bubble.quota::after  { border-right-color: #fffbe8; }
+
+    /* ===== CREDIT ===== */
+    .credit {
+      font-size: 10px;
+      color: var(--ink);
+      text-align: center;
+      opacity: 0.4;
+      font-weight: 700;
+      padding-bottom: 4px;
     }
   </style>
 </head>
 <body>
 
-<!-- ===== EXPLOSION ===== -->
+<!-- ===== EXPLOSION OVERLAY ===== -->
 <div id="explosion">
-  <canvas id="sparks-canvas" class="sparks"></canvas>
-  <div id="yt-container" style="display:none; position:absolute; inset:0; z-index:10; background:#000;">
-    <iframe
-      id="yt-iframe"
-      width="100%" height="100%"
-      frameborder="0"
-      allow="autoplay; fullscreen"
-      allowfullscreen
-      style="border:none;"
-    ></iframe>
-    <button id="dismiss-btn-yt" onclick="dismissExplosion()" style="
-      position:absolute; bottom:40px; left:50%; transform:translateX(-50%);
-      padding:14px 48px; background:transparent; border:2px solid #ff4400;
-      color:#ff4400; font-size:18px; font-weight:bold; border-radius:8px;
-      cursor:pointer; letter-spacing:2px; z-index:11;
-    ">…わかった、やる</button>
-  </div>
-  <div class="shia-face">💪</div>
-  <div class="just-do-it-text" id="jdi-text">JUST<br>DO IT!!</div>
-  <div class="oji-speech" id="oji-speech"></div>
+  <div class="speed-lines"></div>
+  <canvas id="sparks-canvas"></canvas>
+  <canvas id="shia-canvas-explosion"></canvas>
+  <div class="explosion-title" id="jdi-text">JUST<br>DO IT!!</div>
+  <div class="explosion-speech" id="oji-speech"></div>
   <button id="dismiss-btn" onclick="dismissExplosion()">…わかった、やる</button>
 </div>
+
+<!-- shia comment canvas（メインUI上に重ねる） -->
+<canvas id="shia-canvas-comment"></canvas>
 
 <!-- ===== MAIN ===== -->
 <div class="wrapper">
@@ -443,14 +632,14 @@
 
   <div class="gauge-section">
     <div class="gauge-label">
-      <span>⚡ 言い訳ゲージ</span>
+      <span class="label-text">⚡ 言い訳ゲージ</span>
       <span class="pct" id="gauge-pct">0%</span>
     </div>
     <div class="gauge-bar">
       <div class="gauge-fill" id="gauge-fill"></div>
     </div>
     <div class="gauge-stages">
-      <span>😌 大丈夫</span>
+      <span>😌 余裕</span>
       <span>😐 怪しい</span>
       <span>😤 危険</span>
       <span>💥 限界</span>
@@ -461,10 +650,11 @@
 
   <div class="input-area">
     <textarea id="user-input" placeholder="で、今日は何やるんだ？" rows="2"></textarea>
-    <button class="send-btn" id="send-btn" onclick="handleSend()">↑</button>
+    <button class="send-btn" id="send-btn" onclick="handleSend()">▲</button>
   </div>
 
-  <p class="hint">Enter で送信 / Shift+Enter で改行</p>
+  <p class="hint">Enter で送信 ／ Shift+Enter で改行</p>
+  <p class="credit">Inspired by Shia LaBeouf "Just Do It" (2015) — Non-commercial fan project</p>
 </div>
 
 <script>
@@ -513,6 +703,14 @@ typeの定義：
 scoreは必ず正の整数（0-50）。EXCUSEなら増加量、ACTIONなら減少量、NEUTRALなら0。負の値は返さないこと。
 replyは1〜3文。ゲージ値と会話の文脈を踏まえた返答。`;
 
+// ===== クォータ/レート制限時のキャラクター発言 =====
+const QUOTA_MESSAGES = [
+  '…今は少し待て。俺にも限界はある。だがお前への期待は、永遠に限界を知らない。',
+  '休憩だ。俺が休む間に、お前は次に何をやるか考えておけ。',
+  '…少し間を置こう。次に話す時、言い訳はなしだ。いいな？',
+  '今は俺の声が届かない。だがその間も、時間は動いている。無駄にするな。',
+  '…静かにしてろ。俺が戻ってきたら、お前の「やった」という報告だけ聞く。',
+];
 
 // ===== GAUGE =====
 function getGaugeStage() {
@@ -526,39 +724,37 @@ function updateGauge(value) {
   gaugeValue = Math.min(Math.max(value, 0), GAUGE_MAX);
   const pct = Math.round(gaugeValue);
 
-  const fill = document.getElementById('gauge-fill');
-  fill.style.setProperty('--gauge-pct', pct + '%');
-  fill.style.minWidth = pct === 0 ? '0' : '4px';
+  document.documentElement.style.setProperty('--gauge-pct', pct + '%');
   document.getElementById('gauge-pct').textContent = pct + '%';
 
   let color;
-  if (pct < 40) color = '#4ade80';
-  else if (pct < 70) color = '#facc15';
-  else if (pct < 90) color = '#f97316';
-  else color = '#ef4444';
+  if (pct < 40)      color = '#06d6a0';
+  else if (pct < 70) color = '#ffd60a';
+  else if (pct < 90) color = '#ff7f11';
+  else               color = '#e63946';
 
   document.documentElement.style.setProperty('--gauge-color', color);
 
+  const fill = document.getElementById('gauge-fill');
   if (pct >= 70) {
-    fill.style.animation = 'gauge-flash 0.6s infinite';
+    fill.style.animation = 'gauge-flash 0.5s infinite';
   } else {
     fill.style.animation = 'none';
   }
 }
 
 // ===== CHAT UI =====
-function addMessage(role, text, isWarning = false) {
+function addMessage(role, text, styleClass = '') {
   const box = document.getElementById('chat-box');
   const div = document.createElement('div');
   div.className = `msg ${role}`;
 
   const avatar = document.createElement('div');
-  // A案: 炎背景＋リアル系絵文字 / B案: .avatar-alt でJDIテキストに切り替え可
-  avatar.className = 'avatar'; // B案を見たい場合は 'avatar avatar-alt' に変更
+  avatar.className = 'avatar';
   avatar.textContent = role === 'oji' ? '🧔‍♂️' : '🙋';
 
   const bubble = document.createElement('div');
-  bubble.className = 'bubble' + (isWarning ? ' warning' : '');
+  bubble.className = 'bubble' + (styleClass ? ' ' + styleClass : '');
 
   if (role === 'oji') {
     bubble.textContent = '';
@@ -609,8 +805,98 @@ function removeThinking() {
   if (el) el.remove();
 }
 
+// ===== CHROMA KEY CANVAS =====
+// グリーン除去してcanvasに描画するユーティリティ
+function drawChromaKey(videoEl, canvasEl, threshold = 80) {
+  const w = canvasEl.width;
+  const h = canvasEl.height;
+  const ctx = canvasEl.getContext('2d');
+
+  // 一時canvasでピクセル操作
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = w;
+  tmpCanvas.height = h;
+  const tmpCtx = tmpCanvas.getContext('2d');
+
+  tmpCtx.drawImage(videoEl, 0, 0, w, h);
+  const imageData = tmpCtx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    // グリーンスクリーン判定: G が R, B より閾値以上大きい
+    if (g > r + threshold && g > b + threshold) {
+      data[i + 3] = 0; // 透明化
+    }
+  }
+  ctx.clearRect(0, 0, w, h);
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// ===== SHIA COMMENT VIDEO (チラ見せ) =====
+let commentVideo = null;
+let commentAnimFrame = null;
+let commentHideTimer = null;
+
+function initCommentVideo() {
+  commentVideo = document.createElement('video');
+  commentVideo.src = 'shia_comment.mp4';
+  commentVideo.preload = 'auto';
+  commentVideo.muted = true;
+  commentVideo.playsInline = true;
+  commentVideo.loop = false;
+  commentVideo.crossOrigin = 'anonymous';
+}
+
+function showCommentVideo() {
+  if (!commentVideo) return;
+
+  const canvas = document.getElementById('shia-canvas-comment');
+  canvas.width = 280;
+  canvas.height = 420;
+  canvas.classList.add('visible');
+
+  commentVideo.currentTime = 0;
+  commentVideo.play().catch(() => {});
+
+  // 前のアニメーション停止
+  if (commentAnimFrame) cancelAnimationFrame(commentAnimFrame);
+  if (commentHideTimer) clearTimeout(commentHideTimer);
+
+  function renderFrame() {
+    if (commentVideo.ended || commentVideo.paused) {
+      hideCommentVideo();
+      return;
+    }
+    drawChromaKey(commentVideo, canvas, 70);
+    commentAnimFrame = requestAnimationFrame(renderFrame);
+  }
+
+  commentVideo.addEventListener('play', () => {
+    commentAnimFrame = requestAnimationFrame(renderFrame);
+  }, { once: true });
+
+  // 動画終了 or 10秒でフェードアウト
+  commentHideTimer = setTimeout(hideCommentVideo, 10000);
+}
+
+function hideCommentVideo() {
+  const canvas = document.getElementById('shia-canvas-comment');
+  canvas.classList.remove('visible');
+  if (commentAnimFrame) {
+    cancelAnimationFrame(commentAnimFrame);
+    commentAnimFrame = null;
+  }
+  if (commentVideo) {
+    commentVideo.pause();
+  }
+}
+
 // ===== EXPLOSION =====
-let animFrame;
+let sparkAnimFrame = null;
+
 function spawnSparks() {
   const canvas = document.getElementById('sparks-canvas');
   const ctx = canvas.getContext('2d');
@@ -618,43 +904,106 @@ function spawnSparks() {
   canvas.height = window.innerHeight;
 
   const particles = [];
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < 150; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 22 + 4;
     particles.push({
       x: canvas.width / 2,
-      y: canvas.height / 2,
-      vx: (Math.random() - 0.5) * 20,
-      vy: (Math.random() - 0.5) * 20,
+      y: canvas.height * 0.4,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 5,
       life: 1,
-      size: Math.random() * 8 + 2,
-      color: ['#ff4400','#ff8800','#ffcc00','#ffffff'][Math.floor(Math.random()*4)],
+      size: Math.random() * 10 + 3,
+      color: ['#e63946', '#ff7f11', '#ffd60a', '#ffffff', '#06d6a0'][Math.floor(Math.random() * 5)],
     });
   }
 
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (const p of particles) {
-      const r = p.size * p.life;
-      if (r <= 0 || p.life <= 0) continue;
-      ctx.globalAlpha = Math.max(0, p.life);
+      if (p.life <= 0) continue;
+      // 星型にする
+      ctx.globalAlpha = Math.max(0, p.life * p.life);
       ctx.fillStyle = p.color;
+      ctx.strokeStyle = '#1a1a2e';
+      ctx.lineWidth = 1;
+      const r = p.size * p.life;
       ctx.beginPath();
       ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.4;
-      p.life -= 0.012;
+      p.vy += 0.5;
+      p.vx *= 0.97;
+      p.life -= 0.014;
     }
     ctx.globalAlpha = 1;
     if (particles.some(p => p.life > 0)) {
-      animFrame = requestAnimationFrame(draw);
+      sparkAnimFrame = requestAnimationFrame(draw);
     }
   }
   draw();
 }
 
+// 爆発時のShia canvas chroma key
+let explosionVideo = null;
+let explosionAnimFrame = null;
+
+function initExplosionVideo() {
+  explosionVideo = document.createElement('video');
+  explosionVideo.src = 'shia_explosion.mp4';
+  explosionVideo.preload = 'auto';
+  explosionVideo.muted = true;
+  explosionVideo.playsInline = true;
+  explosionVideo.loop = true;
+  explosionVideo.crossOrigin = 'anonymous';
+}
+
+function startExplosionVideo() {
+  if (!explosionVideo) return;
+
+  const canvas = document.getElementById('shia-canvas-explosion');
+  const W = Math.min(window.innerWidth * 0.45, 400);
+  canvas.width = W;
+  canvas.height = W * 1.5;
+  canvas.style.width = W + 'px';
+  canvas.style.height = (W * 1.5) + 'px';
+
+  explosionVideo.currentTime = 0;
+  explosionVideo.play().catch(() => {});
+
+  if (explosionAnimFrame) cancelAnimationFrame(explosionAnimFrame);
+
+  function renderFrame() {
+    drawChromaKey(explosionVideo, canvas, 65);
+    explosionAnimFrame = requestAnimationFrame(renderFrame);
+  }
+
+  explosionVideo.addEventListener('play', () => {
+    explosionAnimFrame = requestAnimationFrame(renderFrame);
+  }, { once: true });
+
+  // video読み込み済みならすぐ開始
+  if (explosionVideo.readyState >= 2) {
+    explosionAnimFrame = requestAnimationFrame(renderFrame);
+  }
+}
+
+function stopExplosionVideo() {
+  if (explosionAnimFrame) {
+    cancelAnimationFrame(explosionAnimFrame);
+    explosionAnimFrame = null;
+  }
+  if (explosionVideo) {
+    explosionVideo.pause();
+  }
+  const canvas = document.getElementById('shia-canvas-explosion');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 // ===== TRIGGER WORDS =====
-// これらのワードが含まれると問答無用でゲージ100%→爆発
 const TRIGGER_WORDS = [
   'めんどい', 'めんどくさい', '無理', 'やりたくない', 'やる気ない',
   '疲れた', 'つかれた', '眠い', 'ねむい', 'だるい',
@@ -683,60 +1032,16 @@ function triggerExplosion() {
   document.getElementById('explosion').classList.add('active');
   document.body.style.overflow = 'hidden';
   spawnSparks();
-  document.body.style.animation = 'shake 0.1s infinite';
-  setTimeout(() => { document.body.style.animation = ''; }, 1000);
-
-  // 1.5秒後にYouTube動画をオーバーレイ表示
-  setTimeout(() => {
-    const ytContainer = document.getElementById('yt-container');
-    const ytIframe = document.getElementById('yt-iframe');
-    const baseUrl = 'https://www.youtube.com/embed/ZXsQAXx_ao0?start=0&rel=0&modestbranding=1';
-
-    // 音ありで試みる
-    ytIframe.src = baseUrl + '&autoplay=1';
-    ytContainer.style.display = 'block';
-
-    // iframe load後にYouTube IFrame APIのpostMessageで再生状態を確認
-    // autoplayがブロックされた場合（=ミュートなしで再生不可）はmute=1で再試行
-    ytIframe.onload = () => {
-      setTimeout(() => {
-        // YouTube IFrame API: getPlayerState を送信
-        ytIframe.contentWindow.postMessage(
-          JSON.stringify({ event: 'command', func: 'getPlayerState', args: [] }),
-          'https://www.youtube.com'
-        );
-      }, 500);
-    };
-
-    // YT IFrame APIからの返答を受け取る
-    // state: -1=未開始, 1=再生中, 2=一時停止, 3=バッファ中, 5=停止
-    const onYtMessage = (e) => {
-      if (e.origin !== 'https://www.youtube.com') return;
-      try {
-        const data = JSON.parse(e.data);
-        if (data.event === 'infoDelivery' && data.info && 'playerState' in data.info) {
-          const state = data.info.playerState;
-          // -1（未開始）= autoplayブロックされた → ミュートで再試行
-          if (state === -1 || state === 2) {
-            ytIframe.src = baseUrl + '&autoplay=1&mute=1';
-          }
-          window.removeEventListener('message', onYtMessage);
-        }
-      } catch(e) { /* parse失敗は無視 */ }
-    };
-    window.addEventListener('message', onYtMessage);
-  }, 1500);
+  startExplosionVideo();
+  document.body.style.animation = 'shake 0.12s infinite';
+  setTimeout(() => { document.body.style.animation = ''; }, 800);
 }
 
 function dismissExplosion() {
-  // YouTube停止（src空にして再生を止める）
-  const ytIframe = document.getElementById('yt-iframe');
-  ytIframe.src = '';
-  document.getElementById('yt-container').style.display = 'none';
-
+  stopExplosionVideo();
   document.getElementById('explosion').classList.remove('active');
   document.body.style.overflow = '';
-  cancelAnimationFrame(animFrame);
+  if (sparkAnimFrame) cancelAnimationFrame(sparkAnimFrame);
 
   const resetInterval = setInterval(() => {
     gaugeValue = Math.max(0, gaugeValue - 5);
@@ -744,7 +1049,6 @@ function dismissExplosion() {
     if (gaugeValue <= 0) clearInterval(resetInterval);
   }, 30);
 
-  // ゲージリセット後の一言（圧強め）
   const dismissPrompts = [
     '…今度言い訳したら、もっと長く流すからな。',
     'やると言った。それだけだ。さっさと動け。',
@@ -753,9 +1057,8 @@ function dismissExplosion() {
     '…わかったならいい。手を動かせ。',
   ];
   const chosen = dismissPrompts[Math.floor(Math.random() * dismissPrompts.length)];
-  addMessage('oji', chosen);
+  addMessage('oji', chosen, 'warning');
 
-  // 会話履歴にも追加
   conversationHistory.push({
     role: 'model',
     parts: [{ text: `{"type":"NEUTRAL","score":0,"reply":"${chosen}"}` }]
@@ -772,12 +1075,12 @@ async function handleSend() {
   input.value = '';
   document.getElementById('send-btn').disabled = true;
 
-  // トリガーワード判定：即座にゲージ100%→爆発
+  // トリガーワード：即座にゲージ100%→爆発
   if (checkTriggerWords(text)) {
     const triggerDelta = 100 - gaugeValue;
     updateGauge(100);
     showGaugePopup(triggerDelta, 'EXCUSE');
-    addMessage('oji', '…その一言は聞き飽きた。', true);
+    addMessage('oji', '…その一言は聞き飽きた。', 'warning');
     setTimeout(() => {
       triggerExplosion();
       document.getElementById('send-btn').disabled = false;
@@ -788,21 +1091,17 @@ async function handleSend() {
   addThinking();
 
   try {
-    // ゲージ情報をシステムに渡す（ユーザーメッセージに付与）
     const contextualMessage = `[現在のゲージ: ${Math.round(gaugeValue)}%]\n${text}`;
-
-    // 会話履歴に実際のユーザーメッセージとして追加する前に
-    // callGeminiでは contextualMessage を送るが、履歴にはtextを入れる
-    // → callGeminiに渡す前に履歴操作を制御する
     const result = await callGeminiWithContext(text, contextualMessage);
 
     removeThinking();
 
-    // ゲージ更新 + ポップアップ表示
     if (result.type === 'EXCUSE') {
       const delta = Math.abs(result.score || 20);
       updateGauge(gaugeValue + delta);
       showGaugePopup(delta, 'EXCUSE');
+      // EXCUSEのときShiaがチラ見せ
+      showCommentVideo();
     } else if (result.type === 'ACTION') {
       const delta = Math.abs(result.score || 25);
       updateGauge(gaugeValue - delta);
@@ -810,32 +1109,42 @@ async function handleSend() {
     }
 
     if (gaugeValue >= EXPLOSION_THRESHOLD) {
-      addMessage('oji', '…もう限界です。', true);
+      addMessage('oji', '…もう限界です。', 'warning');
       setTimeout(() => {
         triggerExplosion();
         document.getElementById('send-btn').disabled = false;
       }, 800);
     } else {
-      const isWarn = gaugeValue >= 70 && result.type === 'EXCUSE';
-      addMessage('oji', result.reply, isWarn);
+      let styleClass = '';
+      if (gaugeValue >= 70 && result.type === 'EXCUSE') styleClass = 'warning';
+      addMessage('oji', result.reply, styleClass);
       document.getElementById('send-btn').disabled = false;
     }
   } catch (err) {
     removeThinking();
-    addMessage('oji', `⚠️ エラー: ${err.message}`, true);
+
+    // クォータ/レート制限判定
+    const errStr = (err.message || '').toLowerCase();
+    const isQuota = errStr.includes('429') || errStr.includes('quota') ||
+                    errStr.includes('rate') || errStr.includes('limit') ||
+                    errStr.includes('resource') || errStr.includes('503');
+
+    if (isQuota) {
+      const msg = QUOTA_MESSAGES[Math.floor(Math.random() * QUOTA_MESSAGES.length)];
+      addMessage('oji', msg, 'quota');
+    } else {
+      addMessage('oji', `⚠️ エラー: ${err.message}`, 'warning');
+    }
     document.getElementById('send-btn').disabled = false;
   }
 }
 
 async function callGeminiWithContext(displayText, contextText) {
-  // 履歴はcontextText（ゲージ情報付き）で送る
   conversationHistory.push({
     role: 'user',
     parts: [{ text: contextText }]
   });
 
-  // APIキーはサーバーサイド（/api/chat）で管理
-  // サーバーが {type, score, reply, rawText} をパース済みで返す
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -847,8 +1156,13 @@ async function callGeminiWithContext(displayText, contextText) {
 
   if (!res.ok) {
     conversationHistory.pop();
-    const err = await res.json();
-    throw new Error(err.error || `HTTP ${res.status}`);
+    // サーバーがエラーJSONを返す場合とそうでない場合に対応
+    let errMsg = `HTTP ${res.status}`;
+    try {
+      const errData = await res.json();
+      errMsg = errData.error || errMsg;
+    } catch (_) {}
+    throw new Error(errMsg);
   }
 
   const parsed = await res.json();
@@ -858,7 +1172,6 @@ async function callGeminiWithContext(displayText, contextText) {
     throw new Error('モデルから有効な返答が得られませんでした');
   }
 
-  // モデルの返答を履歴に追加
   conversationHistory.push({
     role: 'model',
     parts: [{ text: parsed.rawText || JSON.stringify(parsed) }]
@@ -869,8 +1182,8 @@ async function callGeminiWithContext(displayText, contextText) {
 
 // ===== GAUGE POPUP =====
 const EXCUSE_PHRASES = [
-  'JUST DO IT!!', "DON'T LET YOUR DREAMS BE DREAMS!", 'YESTERDAY YOU SAID TOMORROW.',
-  'NOTHING IS IMPOSSIBLE!', 'MAKE YOUR DREAMS COME TRUE!',
+  'JUST DO IT!!', "DON'T LET YOUR\nDREAMS BE DREAMS!", 'YESTERDAY YOU\nSAID TOMORROW.',
+  'NOTHING IS IMPOSSIBLE!', 'MAKE YOUR\nDREAMS COME TRUE!',
 ];
 const ACTION_PHRASES = [
   'YES!! GO GO GO!!', "THAT'S IT!!", 'KEEP GOING!!', 'YOU DID IT!!', 'AMAZING!!',
@@ -879,21 +1192,17 @@ const ACTION_PHRASES = [
 function showGaugePopup(delta, type) {
   if (delta === 0) return;
 
-  // 既存ポップアップを即削除
   document.querySelectorAll('.gauge-popup').forEach(el => el.remove());
 
   const popup = document.createElement('div');
   popup.className = `gauge-popup ${type === 'EXCUSE' ? 'excuse' : type === 'ACTION' ? 'action' : ''}`;
 
-  // パーセンテージ表示
   const pctEl = document.createElement('div');
   pctEl.className = 'popup-pct';
   const sign = type === 'ACTION' ? '−' : '+';
   pctEl.textContent = `${sign}${delta}%`;
-
   popup.appendChild(pctEl);
 
-  // EXCUSEかACTIONのときだけフレーズを出す
   if (type === 'EXCUSE' || type === 'ACTION') {
     const phrases = type === 'EXCUSE' ? EXCUSE_PHRASES : ACTION_PHRASES;
     const phraseEl = document.createElement('div');
@@ -903,8 +1212,6 @@ function showGaugePopup(delta, type) {
   }
 
   document.body.appendChild(popup);
-
-  // アニメーション終了後に削除
   popup.addEventListener('animationend', () => popup.remove());
 }
 
@@ -912,6 +1219,8 @@ function showGaugePopup(delta, type) {
 function initChat() {
   conversationHistory = [];
   updateGauge(0);
+  initCommentVideo();
+  initExplosionVideo();
   setTimeout(() => {
     addMessage('oji', '…来たな。で、今日は何をやる？言い訳は聞かない。');
     conversationHistory.push({
@@ -925,7 +1234,6 @@ window.addEventListener('load', () => {
   initChat();
 });
 
-// ===== KEYBOARD =====
 document.getElementById('user-input').addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
