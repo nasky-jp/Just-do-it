@@ -128,47 +128,7 @@
       margin-top: 4px;
     }
 
-    /* ======= API KEY SETUP ======= */
-    #api-setup {
-      background: var(--surface);
-      border: 1px solid #f59e0b;
-      border-radius: 12px;
-      padding: 16px 20px;
-      display: none;
-    }
-    #api-setup.show { display: block; }
-    #api-setup label {
-      font-size: 13px;
-      color: #f59e0b;
-      font-weight: 600;
-      display: block;
-      margin-bottom: 8px;
-    }
-    #api-setup .api-row {
-      display: flex;
-      gap: 8px;
-    }
-    #api-key-input {
-      flex: 1;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 13px;
-      padding: 8px 12px;
-      outline: none;
-    }
-    #api-key-input:focus { border-color: #f59e0b; }
-    #api-save-btn {
-      padding: 8px 16px;
-      background: #f59e0b;
-      border: none;
-      border-radius: 8px;
-      color: #000;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-    }
+    /* ======= API KEY SETUP（削除済み：サーバーサイドで管理） ======= */
 
     /* ======= GAUGE ======= */
     .gauge-section {
@@ -434,14 +394,6 @@
     <p class="subtitle">言い訳したら怒られるやつ</p>
   </div>
 
-  <div id="api-setup">
-    <label>⚠️ Gemini APIキーを入力してください（aistudio.google.com で取得）</label>
-    <div class="api-row">
-      <input type="password" id="api-key-input" placeholder="AIzaSy...">
-      <button id="api-save-btn" onclick="saveApiKey()">保存</button>
-    </div>
-  </div>
-
   <div class="gauge-section">
     <div class="gauge-label">
       <span>⚡ 言い訳ゲージ</span>
@@ -470,33 +422,12 @@
 
 <script>
 // ===== CONFIG =====
-const GEMINI_MODEL = 'gemini-2.5-flash';
 const GAUGE_MAX = 100;
 const EXPLOSION_THRESHOLD = 100;
 
 // ===== STATE =====
 let gaugeValue = 0;
-let apiKey = '';
-let conversationHistory = []; // Gemini contents形式
-
-// ===== API KEY =====
-function loadApiKey() {
-  const saved = localStorage.getItem('jdi_gemini_key');
-  if (saved) {
-    apiKey = saved;
-    return true;
-  }
-  return false;
-}
-
-function saveApiKey() {
-  const val = document.getElementById('api-key-input').value.trim();
-  if (!val) return;
-  apiKey = val;
-  localStorage.setItem('jdi_gemini_key', val);
-  document.getElementById('api-setup').classList.remove('show');
-  initChat();
-}
+let conversationHistory = [];
 
 // ===== GEMINI API =====
 const SYSTEM_PROMPT = `You are the "JUST DO IT guy" — modeled after Shia LaBeouf's famous motivational speech.
@@ -535,52 +466,6 @@ typeの定義：
 scoreは必ず正の整数（0-50）。EXCUSEなら増加量、ACTIONなら減少量、NEUTRALなら0。負の値は返さないこと。
 replyは1〜3文。ゲージ値と会話の文脈を踏まえた返答。`;
 
-async function callGemini(userMessage) {
-  // 会話履歴にユーザーメッセージ追加
-  conversationHistory.push({
-    role: 'user',
-    parts: [{ text: userMessage }]
-  });
-
-  const body = {
-    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: conversationHistory,
-    generationConfig: {
-      temperature: 0.9,
-      maxOutputTokens: 512,
-    }
-  };
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
-  }
-
-  const data = await res.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-  // JSON抽出（```json ... ``` も対応）
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('JSONパース失敗: ' + rawText);
-  const parsed = JSON.parse(jsonMatch[0]);
-
-  // アシスタントの返答を履歴に追加
-  conversationHistory.push({
-    role: 'model',
-    parts: [{ text: rawText }]
-  });
-
-  return parsed;
-}
 
 // ===== GAUGE =====
 function getGaugeStage() {
@@ -890,39 +775,29 @@ async function handleSend() {
 }
 
 async function callGeminiWithContext(displayText, contextText) {
-  // 履歴はdisplayText、APIにはcontextTextを送る
+  // 履歴はcontextText（ゲージ情報付き）で送る
   conversationHistory.push({
     role: 'user',
     parts: [{ text: contextText }]
   });
 
-  const body = {
-    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    contents: conversationHistory,
-    generationConfig: {
-      temperature: 0.9,
-      maxOutputTokens: 512,
-      responseMimeType: 'application/json',
-    }
-  };
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }
-  );
+  // APIキーはサーバーサイド（/api/chat）で管理
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: conversationHistory,
+    }),
+  });
 
   if (!res.ok) {
     conversationHistory.pop();
     const err = await res.json();
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
+    throw new Error(err.error || `HTTP ${res.status}`);
   }
 
   const data = await res.json();
-  // thinkingモード対応: text partのみ結合
   const parts = data.candidates?.[0]?.content?.parts || [];
   const rawText = parts.filter(p => p.text).map(p => p.text).join('');
 
@@ -933,7 +808,6 @@ async function callGeminiWithContext(displayText, contextText) {
   }
   const parsed = JSON.parse(jsonMatch[0]);
 
-  // モデルの返答を履歴に追加（textのみのparts）
   conversationHistory.push({
     role: 'model',
     parts: [{ text: rawText }]
@@ -956,12 +830,7 @@ function initChat() {
 }
 
 window.addEventListener('load', () => {
-  if (loadApiKey()) {
-    initChat();
-  } else {
-    document.getElementById('api-setup').classList.add('show');
-    updateGauge(0);
-  }
+  initChat();
 });
 
 // ===== KEYBOARD =====
