@@ -130,6 +130,24 @@
 
     /* ======= API KEY SETUP（削除済み：サーバーサイドで管理） ======= */
 
+    /* ======= SHIA CANVAS ======= */
+    #shia-canvas {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      width: 260px;
+      height: 360px;
+      pointer-events: none;
+      z-index: 50;
+      opacity: 0;
+      transform: translateX(40px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    #shia-canvas.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
     /* ======= GAUGE ======= */
     .gauge-section {
       background: var(--surface);
@@ -362,6 +380,12 @@
 </head>
 <body>
 
+<!-- ===== SHIA CHROMA KEY ===== -->
+<!-- video要素は非表示・canvasへの描画ソースとして使用 -->
+<video id="shia-video" src="shia.mp4" muted playsinline loop
+  style="display:none; position:absolute; pointer-events:none;"></video>
+<canvas id="shia-canvas"></canvas>
+
 <!-- ===== EXPLOSION ===== -->
 <div id="explosion">
   <canvas id="sparks-canvas" class="sparks"></canvas>
@@ -497,6 +521,9 @@ function updateGauge(value) {
   } else {
     fill.style.animation = 'none';
   }
+
+  // ゲージ60%以上でShia登場・60%未満で退場
+  if (window.updateShiaVisibility) window.updateShiaVisibility(pct);
 }
 
 // ===== CHAT UI =====
@@ -813,6 +840,80 @@ async function callGeminiWithContext(displayText, contextText) {
 
   return parsed;
 }
+
+// ===== SHIA CHROMA KEY =====
+(function() {
+  const video  = document.getElementById('shia-video');
+  const canvas = document.getElementById('shia-canvas');
+  const ctx    = canvas.getContext('2d', { willReadFrequently: true });
+
+  // canvas解像度をCSS表示サイズに合わせる
+  canvas.width  = 260;
+  canvas.height = 360;
+
+  // グリーンバック除去の閾値（緑チャンネルが赤・青より突出している部分を透過）
+  function chromaKey(imageData) {
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      // 緑が支配的かつ一定の輝度以上のピクセルを透過
+      if (g > 80 && g > r * 1.3 && g > b * 1.3) {
+        d[i + 3] = 0; // alpha = 0（透明）
+      } else if (g > 60 && g > r * 1.1 && g > b * 1.1) {
+        // エッジをなめらかにするため半透明
+        d[i + 3] = Math.round(d[i + 3] * ((g - 60) / 20 < 1 ? (g - 60) / 20 : 1) * 0.5);
+      }
+    }
+    return imageData;
+  }
+
+  let shiaRafId = null;
+
+  function drawFrame() {
+    if (video.paused || video.ended) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    chromaKey(frame);
+    ctx.putImageData(frame, 0, 0);
+    shiaRafId = requestAnimationFrame(drawFrame);
+  }
+
+  function startShia() {
+    video.play().then(() => {
+      canvas.classList.add('visible');
+      drawFrame();
+    }).catch(() => {
+      // autoplay blocked: ユーザー操作後に再試行
+      document.addEventListener('click', () => {
+        video.play().then(() => {
+          canvas.classList.add('visible');
+          drawFrame();
+        });
+      }, { once: true });
+    });
+  }
+
+  function stopShia() {
+    canvas.classList.remove('visible');
+    if (shiaRafId) cancelAnimationFrame(shiaRafId);
+    video.pause();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // ゲージに応じてShiaの表示/非表示を切り替え（外部から呼べるようにグローバル公開）
+  window.updateShiaVisibility = function(gauge) {
+    if (gauge >= 60) {
+      if (video.paused) startShia();
+    } else {
+      if (!video.paused) stopShia();
+    }
+  };
+
+  // ページ読み込み後1秒でぬるっと登場（初回）
+  window.addEventListener('load', () => {
+    setTimeout(startShia, 1000);
+  });
+})();
 
 // ===== INIT =====
 function initChat() {
