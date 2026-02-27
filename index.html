@@ -373,15 +373,13 @@
       50% { transform: translateY(-5px); }
     }
 
-    /* Canvas wrapper with manga panel border */
+    /* Canvas wrapper — ボーダーなし（一体感を保つ） */
     .shia-canvas-wrapper {
       position: relative;
       width: min(32vw, 220px);
       height: min(48vw, 330px);
-      border: 5px solid var(--ink);
-      border-radius: 18px;
       overflow: hidden;
-      box-shadow: 5px 5px 0 var(--ink), 0 0 0 2px var(--yellow);
+      border-radius: 14px;
       background: transparent;
     }
 
@@ -610,9 +608,27 @@
     .input-area {
       display: flex;
       gap: 10px;
+      align-items: flex-end;
     }
-    .input-area textarea {
+    .textarea-wrap {
       flex: 1;
+      position: relative;
+    }
+    .char-count {
+      position: absolute;
+      bottom: 6px;
+      right: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(26,26,46,0.3);
+      pointer-events: none;
+      font-family: var(--font-main);
+      transition: color 0.2s;
+    }
+    .char-count.warn { color: var(--orange); }
+    .char-count.danger { color: var(--red); }
+    .input-area textarea {
+      width: 100%;
       background: rgba(255,255,255,0.95);
       border: var(--border-thick);
       border-radius: 14px;
@@ -775,7 +791,10 @@
   <div class="chat-box" id="chat-box"></div>
 
   <div class="input-area">
-    <textarea id="user-input" placeholder="で、今日は何やるんだ？" rows="2"></textarea>
+    <div class="textarea-wrap">
+      <textarea id="user-input" placeholder="で、今日は何やるんだ？" rows="2" maxlength="500"></textarea>
+      <span class="char-count" id="char-count">0/400</span>
+    </div>
     <button class="send-btn" id="send-btn" onclick="handleSend()">▲</button>
   </div>
 
@@ -978,7 +997,7 @@ function initCommentVideo() {
   commentVideo = document.createElement('video');
   commentVideo.src = 'shia_comment.mp4';
   commentVideo.preload = 'auto';
-  commentVideo.muted = true;
+  commentVideo.muted = false; // 音を有効化（ユーザー操作後なら再生可能）
   commentVideo.playsInline = true;
   commentVideo.loop = false;
   commentVideo.crossOrigin = 'anonymous';
@@ -1036,17 +1055,14 @@ function showCommentVideo() {
     popup.classList.add('shia-visible');
   }, { once: true });
 
-  // 動画再生を試みる
+  // 動画再生を試みる（音あり → 失敗時はミュートで再試行）
   if (commentVideo) {
     commentVideo.currentTime = 0;
-    commentVideo.play().then(() => {
-      // 再生成功 → ビデオ表示（静止画を隠す）
+
+    function startRenderLoop() {
       function renderFrame() {
-        if (!commentVideo || commentVideo.ended || commentVideo.paused) {
-          return;
-        }
+        if (!commentVideo || commentVideo.ended || commentVideo.paused) return;
         drawChromaKey(commentVideo, canvas, 45);
-        // 最初のフレームが描画されたらcanvasを表示
         if (canvas.style.opacity === '0') {
           canvas.style.opacity = '1';
           staticFace.style.display = 'none';
@@ -1054,10 +1070,20 @@ function showCommentVideo() {
         commentAnimFrame = requestAnimationFrame(renderFrame);
       }
       commentAnimFrame = requestAnimationFrame(renderFrame);
-    }).catch(() => {
-      // 動画失敗 → 静止絵文字のままでOK
-      canvas.style.opacity = '0';
-    });
+    }
+
+    commentVideo.play()
+      .then(startRenderLoop)
+      .catch(() => {
+        // 音ありが失敗 → ミュートで再試行（ブラウザの自動再生ポリシー対応）
+        commentVideo.muted = true;
+        commentVideo.play()
+          .then(startRenderLoop)
+          .catch(() => {
+            // 完全に失敗 → 静止絵文字のまま表示
+            canvas.style.opacity = '0';
+          });
+      });
   }
 
   // 6秒後に自動非表示
@@ -1152,7 +1178,7 @@ function initExplosionVideo() {
   explosionVideo = document.createElement('video');
   explosionVideo.src = 'shia_explosion.mp4';
   explosionVideo.preload = 'auto';
-  explosionVideo.muted = true;
+  explosionVideo.muted = false; // 音を有効化
   explosionVideo.playsInline = true;
   explosionVideo.loop = true;
   explosionVideo.crossOrigin = 'anonymous';
@@ -1169,7 +1195,10 @@ function startExplosionVideo() {
   canvas.style.height = (W * 1.5) + 'px';
 
   explosionVideo.currentTime = 0;
-  explosionVideo.play().catch(() => {});
+  explosionVideo.play().catch(() => {
+    explosionVideo.muted = true;
+    explosionVideo.play().catch(() => {});
+  });
 
   if (explosionAnimFrame) cancelAnimationFrame(explosionAnimFrame);
 
@@ -1264,14 +1293,61 @@ function dismissExplosion() {
 }
 
 // ===== MAIN SEND =====
-async function handleSend() {
-  const input = document.getElementById('user-input');
-  const text = input.value.trim();
-  if (!text) return;
+const INPUT_MAX_LEN = 400; // 入力文字数制限
+let isProcessing = false;  // 二重送信防止フラグ
 
-  addMessage('user', text);
+function setProcessing(flag) {
+  isProcessing = flag;
+  const btn = document.getElementById('send-btn');
+  const input = document.getElementById('user-input');
+  if (btn) btn.disabled = flag;
+  if (input) input.disabled = flag;
+}
+
+/** エラー文字列からエラーカテゴリを判定 */
+function classifyError(errMsg) {
+  const s = (errMsg || '').toLowerCase();
+  if (s.includes('429') || s.includes('quota') || s.includes('resource') ||
+      s.includes('rate') || s.includes('exhausted') || s.includes('503')) {
+    return 'quota';
+  }
+  if (s.includes('internal server') || s.includes('応答の解析') ||
+      s.includes('parse') || s.includes('json') || s.includes('500') ||
+      s.includes('empty response') || s.includes('failed')) {
+    return 'parse'; // モデル応答問題 → キャラクター的なフォールバック
+  }
+  return 'other';
+}
+
+// パース失敗時のキャラクターフォールバック発言
+const PARSE_FALLBACK_MESSAGES = [
+  '…うまく聞き取れなかった。もう一度言ってみろ。',
+  '少し混乱した。繰り返してくれ。',
+  '…今はうまく伝わらなかった。だがお前のやる気は伝わっている。もう一度だ。',
+];
+
+async function handleSend() {
+  // 二重送信・処理中は無視
+  if (isProcessing) return;
+
+  const input = document.getElementById('user-input');
+  const rawText = input.value;
+  const text = rawText.trim();
+
+  // 空文字チェック
+  if (!text) {
+    input.value = '';
+    return;
+  }
+
+  // 文字数制限（モンキーテスト対策）
+  const displayText = text.length > INPUT_MAX_LEN
+    ? text.slice(0, INPUT_MAX_LEN) + '…'
+    : text;
+
+  setProcessing(true);
+  addMessage('user', displayText);
   input.value = '';
-  document.getElementById('send-btn').disabled = true;
 
   // トリガーワード：即座にゲージ100%→爆発
   if (checkTriggerWords(text)) {
@@ -1281,7 +1357,7 @@ async function handleSend() {
     addMessage('oji', '…その一言は聞き飽きた。', 'warning');
     setTimeout(() => {
       triggerExplosion();
-      document.getElementById('send-btn').disabled = false;
+      setProcessing(false);
     }, 600);
     return;
   }
@@ -1289,8 +1365,8 @@ async function handleSend() {
   addThinking();
 
   try {
-    const contextualMessage = `[現在のゲージ: ${Math.round(gaugeValue)}%]\n${text}`;
-    const result = await callGeminiWithContext(text, contextualMessage);
+    const contextualMessage = `[現在のゲージ: ${Math.round(gaugeValue)}%]\n${displayText}`;
+    const result = await callGeminiWithContext(displayText, contextualMessage);
 
     removeThinking();
 
@@ -1298,8 +1374,7 @@ async function handleSend() {
       const delta = Math.abs(result.score || 20);
       updateGauge(gaugeValue + delta);
       showGaugePopup(delta, 'EXCUSE');
-      // EXCUSEのときShiaがチラ見せ
-      showCommentVideo();
+      showCommentVideo(); // EXCUSEのときShiaがポップアップ
     } else if (result.type === 'ACTION') {
       const delta = Math.abs(result.score || 25);
       updateGauge(gaugeValue - delta);
@@ -1310,30 +1385,29 @@ async function handleSend() {
       addMessage('oji', '…もう限界です。', 'warning');
       setTimeout(() => {
         triggerExplosion();
-        document.getElementById('send-btn').disabled = false;
+        setProcessing(false);
       }, 800);
     } else {
       let styleClass = '';
       if (gaugeValue >= 70 && result.type === 'EXCUSE') styleClass = 'warning';
       addMessage('oji', result.reply, styleClass);
-      document.getElementById('send-btn').disabled = false;
+      setProcessing(false);
     }
   } catch (err) {
     removeThinking();
 
-    // クォータ/レート制限判定
-    const errStr = (err.message || '').toLowerCase();
-    const isQuota = errStr.includes('429') || errStr.includes('quota') ||
-                    errStr.includes('rate') || errStr.includes('limit') ||
-                    errStr.includes('resource') || errStr.includes('503');
-
-    if (isQuota) {
+    const category = classifyError(err.message);
+    if (category === 'quota') {
       const msg = QUOTA_MESSAGES[Math.floor(Math.random() * QUOTA_MESSAGES.length)];
       addMessage('oji', msg, 'quota');
+    } else if (category === 'parse') {
+      // モデル応答解析失敗 → キャラクターらしいフォールバック（エラー文字を見せない）
+      const msg = PARSE_FALLBACK_MESSAGES[Math.floor(Math.random() * PARSE_FALLBACK_MESSAGES.length)];
+      addMessage('oji', msg, 'quota');
     } else {
-      addMessage('oji', `⚠️ エラー: ${err.message}`, 'warning');
+      addMessage('oji', `⚠️ 接続エラーが発生しました。もう一度試してください。`, 'warning');
     }
-    document.getElementById('send-btn').disabled = false;
+    setProcessing(false);
   }
 }
 
@@ -1430,13 +1504,31 @@ function initChat() {
 
 window.addEventListener('load', () => {
   initChat();
-});
 
-document.getElementById('user-input').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    handleSend();
-  }
+  const input = document.getElementById('user-input');
+  const charCount = document.getElementById('char-count');
+
+  // 文字カウンター更新
+  input.addEventListener('input', () => {
+    const len = input.value.length;
+    charCount.textContent = `${Math.min(len, INPUT_MAX_LEN)}/${INPUT_MAX_LEN}`;
+    charCount.classList.toggle('warn', len > INPUT_MAX_LEN * 0.75 && len <= INPUT_MAX_LEN);
+    charCount.classList.toggle('danger', len > INPUT_MAX_LEN);
+  });
+
+  // Enter 送信（処理中は無視）
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!isProcessing) handleSend();
+    }
+  });
+
+  // ページ離脱時に動画リソースを解放
+  window.addEventListener('pagehide', () => {
+    if (commentVideo) commentVideo.src = '';
+    if (explosionVideo) explosionVideo.src = '';
+  });
 });
 </script>
 <script src="agentation.js"></script>

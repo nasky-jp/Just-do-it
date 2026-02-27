@@ -3,6 +3,51 @@
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
+/** JSONが切り捨てられた場合のフォールバック: 正規表現でフィールドを個別抽出 */
+function extractFieldsFallback(text) {
+  const typeMatch = text.match(/"type"\s*:\s*"(EXCUSE|ACTION|NEUTRAL)"/);
+  const scoreMatch = text.match(/"score"\s*:\s*(\d+)/);
+  // reply の抽出: 終端 " がなくても取得
+  const replyMatch = text.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)(?:"|$)/);
+
+  if (typeMatch && replyMatch) {
+    return {
+      type: typeMatch[1],
+      score: scoreMatch ? parseInt(scoreMatch[1], 10) : 0,
+      reply: replyMatch[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/, '\\')
+        .trim(),
+    };
+  }
+  return null;
+}
+
+/** rawText から JSON を取り出してパースする（複数フォールバック付き） */
+function parseModelResponse(rawText) {
+  // 1. Markdown コードブロック内の JSON を試みる
+  const mdMatch = rawText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+  if (mdMatch) {
+    try { return JSON.parse(mdMatch[1]); } catch (_) {}
+  }
+
+  // 2. 最初の { から最後の } までを取り出す
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try { return JSON.parse(jsonMatch[0]); } catch (_) {}
+    // 3. JSON が切り捨てられている → フォールバック抽出
+    const fallback = extractFieldsFallback(jsonMatch[0]);
+    if (fallback) return fallback;
+  }
+
+  // 4. テキスト全体でフォールバック抽出
+  const fallback = extractFieldsFallback(rawText);
+  if (fallback) return fallback;
+
+  return null;
+}
+
 export default async function handler(req, res) {
   // CORS ヘッダー
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,48 +76,48 @@ export default async function handler(req, res) {
           contents: contents.slice(-40), // 過去20ターンまでに制限
           generationConfig: {
             temperature: 0.9,
-            maxOutputTokens: 512,
-            // responseMimeType は指定しない（モデルによって挙動が異なるため）
+            maxOutputTokens: 1024, // 512では日本語で切り捨てが発生するため増量
           },
         }),
       }
     );
 
     if (!upstream.ok) {
-      let errMsg = 'Upstream error';
+      let errMsg = `HTTP ${upstream.status}`;
       try {
         const err = await upstream.json();
         errMsg = err.error?.message || errMsg;
       } catch (_) {}
       // クォータ/レート制限は 429 で返ってくる
-      // フロント側がエラーメッセージ文字列でキャラクター発言に振り分けるため
-      // ステータスコードをそのまま転送する
       return res.status(upstream.status).json({ error: errMsg });
     }
 
     const data = await upstream.json();
 
-    // サーバーサイドでテキストを結合してJSONをパース
     const parts = data.candidates?.[0]?.content?.parts || [];
     const rawText = parts.filter(p => p.text).map(p => p.text).join('');
 
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return res.status(500).json({ error: `JSONパース失敗: ${rawText.slice(0, 200)}` });
+    if (!rawText) {
+      // finishReason が SAFETY や RECITATION の場合など
+      const finishReason = data.candidates?.[0]?.finishReason;
+      return res.status(500).json({ error: `Empty response (finishReason: ${finishReason || 'unknown'})` });
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = parseModelResponse(rawText);
+
+    if (!parsed) {
+      return res.status(500).json({ error: `応答の解析に失敗しました: ${rawText.slice(0, 100)}` });
+    }
 
     // type / score / reply のバリデーション
     if (!parsed.type || !['EXCUSE', 'ACTION', 'NEUTRAL'].includes(parsed.type)) {
-      return res.status(500).json({ error: 'Invalid response type from model' });
+      parsed.type = 'NEUTRAL'; // フォールバック
     }
 
     return res.status(200).json({
       type: parsed.type,
       score: Math.abs(parseInt(parsed.score) || 0),
-      reply: String(parsed.reply || ''),
-      // フロント側で会話履歴に追加するためにrawTextも返す
+      reply: String(parsed.reply || '…'),
       rawText,
     });
 
